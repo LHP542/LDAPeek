@@ -165,6 +165,29 @@ Vergleiche laufen über `unchecked((uint)…)`. Und `accountExpires` /
 - **`xunit.v3` bringt kein implizites `using Xunit;`** mit; deshalb
   `LDAPeek.Tests/GlobalUsings.cs`.
 
+### CI: keine VSTest-Flags an `dotnet test`
+
+Der erste CI-Lauf war rot, **obwohl kein Test fehlschlug**. Ursache war
+`--logger "trx;LogFileName=test-results.trx"` im Workflow: xunit.v3 läuft auf
+der Microsoft.Testing.Platform, die das VSTest-Flag nicht kennt — sie druckt
+ihre Optionshilfe und führt **null Tests** aus. Der Lauf endet mit
+„no tests were run" und Exitcode 5, was wie ein kaputtes Testprojekt aussieht.
+Dasselbe gilt für `--nologo`, `--report-trx` und den `--`-Separator; `-c`,
+`--no-build` und ein Projekt-/Solution-Argument gehen normal.
+
+`--report-trx` bräuchte zusätzlich das Paket
+`Microsoft.Testing.Extensions.TrxReport` — das liegt nicht im Offline-Feed und
+ist über nuget.org nicht ladbar (siehe 403-Hinweis oben). Deshalb erzeugt der
+Workflow die Fehler-Annotations aus der **Konsolenausgabe** statt aus einer TRX.
+Dafür steht `DOTNET_CLI_UI_LANGUAGE: en-US` im Job: der Parser sucht `failed …`,
+bei deutscher Ausgabe hieße die Zeile `fehlerhaft …` und er fände nichts.
+
+Der Parser wurde gegen einen absichtlich kaputt gemachten Test gegengeprüft — er
+erzeugt eine `::error title=…::`-Annotation mit Testname und Assertion-Meldung.
+Das ist hier nicht optional: das Job-Log liefert die GitHub-API nur mit
+Admin-Rechten am Repo (403), und `gh` ist auf dem Arbeitslaptop nicht
+installiert. Ohne Annotation steht man vor einer Wand.
+
 ### Nicht anfassen ohne Grund
 
 - **`WriteInstallerScript` in `UpdateService`**: die Batch-Zeilen dürfen keine

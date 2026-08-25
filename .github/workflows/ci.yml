@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  # Englische Ausgabe erzwingen. Der Annotation-Schritt unten parst die
+  # Konsolenausgabe von "dotnet test" — mit lokalisierter Ausgabe hieße die
+  # Fehlerzeile "fehlerhaft" statt "failed" und der Parser fände nichts.
+  DOTNET_CLI_UI_LANGUAGE: en-US
+
 jobs:
   build-test:
     # LDAPeek zielt auf net10.0-windows — die Tests müssen auf Windows laufen.
@@ -23,28 +29,52 @@ jobs:
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
 
+      # ACHTUNG: KEINE VSTest-Flags anhängen. xunit.v3 läuft auf der
+      # Microsoft.Testing.Platform, und ein "--logger trx;..." wird von ihr
+      # nicht erkannt: sie druckt ihre Optionshilfe und führt NULL Tests aus.
+      # Der Lauf ist dann rot mit "no tests were run" — was wie ein kaputtes
+      # Testprojekt aussieht, aber nur das Flag ist. Dasselbe gilt für
+      # --nologo, --report-trx und den "--"-Separator. Real hier passiert
+      # (2026-08-25), deshalb steht der Hinweis direkt über dem Befehl.
       - name: Tests
-        run: dotnet test --no-build -c Release --logger "trx;LogFileName=test-results.trx"
+        shell: pwsh
+        run: |
+          dotnet test --no-build -c Release 2>&1 | Tee-Object -FilePath test-output.txt
+          exit $LASTEXITCODE
 
       # Ohne diesen Schritt steht in der Job-Zusammenfassung eines roten Laufs
       # nur "Process completed with exit code 1", und das Job-Log liefert die
-      # API nur mit Admin-Rechten am Repo. Annotations sind dagegen öffentlich
-      # lesbar — ohne installiertes gh ist das der einzige Weg, den echten
-      # Testfehler zu sehen.
+      # API nur mit Admin-Rechten am Repo (403). Ohne installiertes gh steht man
+      # dann vor einer Wand. Annotations sind dagegen öffentlich lesbar.
       - name: Testfehler als Annotation ausgeben
         if: failure()
         shell: pwsh
         run: |
-          $files = Get-ChildItem -Recurse -Filter test-results.trx -ErrorAction SilentlyContinue
-          foreach ($file in $files) {
-            [xml]$trx = Get-Content $file.FullName
-            foreach ($result in $trx.TestRun.Results.UnitTestResult) {
-              if ($result.outcome -ne 'Failed') { continue }
-              $message = $result.Output.ErrorInfo.Message
-              $stack = ($result.Output.ErrorInfo.StackTrace -split "`n" | Select-Object -First 1)
-              # Zeilenumbrüche als %0A escapen, sonst bricht die Annotation
-              # nach der ersten Zeile ab.
-              $body = ("$message`n$stack" -replace "`r", '' -replace "`n", '%0A')
-              Write-Host "::error title=$($result.testName)::$body"
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8
+          if (-not (Test-Path test-output.txt)) {
+            Write-Host "::error::Kein test-output.txt — der Lauf ist vor den Tests gescheitert."
+            exit 0
+          }
+          $lines = Get-Content test-output.txt -Encoding utf8
+          $found = 0
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -notmatch '^failed\s+(?<name>[^\s(]+)') { continue }
+            $name = $Matches.name
+            $msg = @()
+            for ($j = $i + 1; $j -lt $lines.Count -and $msg.Count -lt 4; $j++) {
+              $l = $lines[$j]
+              # Nächster Testblock, Leerzeile, Stacktrace oder die
+              # "from <assembly>.dll"-Zeile beenden die Meldung.
+              if ($l -match '^\S' -or $l.Trim() -eq '') { break }
+              if ($l -match '^\s+(at |Stack Trace|from )') { break }
+              $msg += $l.Trim()
             }
+            # Zeilenumbrüche als %0A escapen, sonst bricht die Annotation nach
+            # der ersten Zeile ab.
+            $body = ($msg -join '%0A') -replace "`r", ''
+            Write-Host "::error title=$name::$body"
+            $found++
+          }
+          if ($found -eq 0) {
+            Write-Host "::error::Testlauf rot, aber keine Fehlerzeile gefunden — bitte ins Job-Log sehen."
           }

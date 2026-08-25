@@ -53,12 +53,24 @@ public class DirectoryServiceTests
     {
         // Der DC-Locator braucht den DNS-Namen (lhp.intern), nicht den
         // NetBIOS-Namen — deshalb hat USERDNSDOMAIN Vorrang.
-        string? expected = Environment.GetEnvironmentVariable("USERDNSDOMAIN")
-                           ?? Environment.GetEnvironmentVariable("USERDOMAIN");
+        //
+        // Die Erwartung muss dieselbe Leer-Semantik benutzen wie die Produktion
+        // (IsNullOrWhiteSpace), nicht bloß "?? ". Sonst gehen die beiden bei
+        // einer auf Leerstring GESETZTEN Variable auseinander: der Test erwartet
+        // dann "", während DefaultDomain() korrekt auf USERDOMAIN ausweicht.
+        // Auf einem nicht domänengebundenen Rechner — etwa einem CI-Runner —
+        // ist genau das der Normalfall.
+        static string? NonEmpty(string name) =>
+            Environment.GetEnvironmentVariable(name) is { } v && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+        string? expected = NonEmpty("USERDNSDOMAIN") ?? NonEmpty("USERDOMAIN");
 
         if (expected is null)
         {
-            WindowsOnly.Require(false);
+            // Weder DNS- noch NetBIOS-Domäne gesetzt: dann MUSS DefaultDomain()
+            // sauber scheitern statt einen leeren Servernamen zurückzugeben.
+            Action act = () => DirectoryService.DefaultDomain();
+            act.Should().Throw<DirectoryAccessException>();
             return;
         }
 
