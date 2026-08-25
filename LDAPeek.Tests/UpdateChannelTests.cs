@@ -29,7 +29,7 @@ public class UpdateChannelTests
     }
 
     [Theory]
-    [InlineData("https://github.com/Kroste/LDAPeek")]
+    [InlineData("https://github.com/LHP542/LDAPeek")]
     [InlineData("http://intern/updates")]
     [InlineData("HTTPS://EXAMPLE.COM/x")]
     [InlineData("")]

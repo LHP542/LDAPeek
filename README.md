@@ -1,7 +1,7 @@
 # LDAPeek
 
-[![CI](https://github.com/Kroste/LDAPeek/actions/workflows/ci.yml/badge.svg)](https://github.com/Kroste/LDAPeek/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Kroste/LDAPeek)](https://github.com/Kroste/LDAPeek/releases)
+[![CI](https://github.com/LHP542/LDAPeek/actions/workflows/ci.yml/badge.svg)](https://github.com/LHP542/LDAPeek/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/LHP542/LDAPeek)](https://github.com/LHP542/LDAPeek/releases)
 
 Active-Directory-Konten nachschlagen: Stammdaten, Kontozustand und vor allem die
 **Gruppenmitgliedschaften — inklusive der über Verschachtelung geerbten**.
@@ -49,7 +49,7 @@ hineingekommen ist:
 ## Installation
 
 Es gibt keine Installation. Das ZIP von der
-[Releases-Seite](https://github.com/Kroste/LDAPeek/releases) oder aus
+[Releases-Seite](https://github.com/LHP542/LDAPeek/releases) oder aus
 `\\samba01\542$\5424_IT-Basis-Dienste\LDAPeek` entpacken und `LDAPeek.exe`
 starten. Das Paket ist self-contained — .NET muss nicht installiert sein.
 

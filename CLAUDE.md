@@ -9,7 +9,7 @@
   Secret-Masking), xunit.v3 + FluentAssertions 7.x.
 - **Struktur:** Flach (kein `src/`), `.slnx`, Central Package Management,
   `Directory.Build.props`, MinVer (Tags `v*`).
-- **Repo:** `github.com/Kroste/LDAPeek`.
+- **Repo:** `github.com/LHP542/LDAPeek`.
 - **Kommunikation:** Deutsch, „du". Lars entwirft, Claude implementiert.
 
 ### Bewusste Abweichungen vom Kroste-Standard
