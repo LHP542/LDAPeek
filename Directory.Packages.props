@@ -5,11 +5,19 @@
        2026-08 die eigentlichen Paket-Downloads von nuget.org (HTTP 403 auf
        /v3-flatcontainer/*.nupkg), obwohl die Metadaten durchgehen und px
        sauber authentifiziert. Ein "dotnet package search" meldet deshalb
-       neuere Versionen, die sich nicht laden lassen. Die Versionen hier
-       entsprechen dem, was im Offline-Feed C:\NuGet-Local liegt. Vor einem
-       Bump erst prüfen, ob das Paket dort vorhanden ist — sonst ist der
-       Restore auf dem Arbeitsplatz kaputt, während die GitHub Actions grün
-       bleiben. -->
+       neuere Versionen, die sich nicht laden lassen.
+
+       Maßgeblich ist also, was im Offline-Feed C:\NuGet-Local liegt:
+
+           ls C:/NuGet-Local | grep -i <paket>
+
+       Nachschub kommt über Nougat (LHP542/Nougat) — es liest genau diese
+       Datei aus allen LHP542-Repos, restored auf Linux und schreibt einen
+       flachen NuGet-Local-Ordner zum Mitnehmen. Reihenfolge deshalb:
+       erst hier anheben und pushen, dann Nougat laufen lassen, dann den
+       Ordner auf den Arbeitslaptop kopieren. Zwischen Schritt 1 und 3 ist
+       der lokale Restore erwartungsgemäß kaputt, während die GitHub Actions
+       grün bleiben (der Runner kommt an nuget.org heran). -->
   <ItemGroup>
     <!-- Avalonia. DiagnosticsSupport folgt NICHT der Avalonia-Version
          (eigene 2.x-Reihe).
@@ -19,10 +27,10 @@
          XAML-Aufgabe ist inkrementell) — lokal nach einem Retry unsichtbar,
          im CI jedes Mal rot. Die Gruppenliste ist deshalb eine ListBox mit
          Grid-ItemTemplate. -->
-    <PackageVersion Include="Avalonia" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.0" />
+    <PackageVersion Include="Avalonia" Version="12.1.1" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.1" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.1" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.1" />
     <!-- Nur Debug-Builds referenzieren dieses Paket (DevTools) -->
     <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
 
@@ -31,7 +39,7 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
 
     <!-- Logging -->
-    <PackageVersion Include="NLog" Version="6.1.3" />
+    <PackageVersion Include="NLog" Version="6.2.0" />
 
     <!-- Active Directory: reines LDAP über System.DirectoryServices.Protocols.
          Kein System.DirectoryServices/AccountManagement — die gehen über
