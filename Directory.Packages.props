@@ -31,7 +31,7 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
 
     <!-- Logging -->
-    <PackageVersion Include="NLog" Version="6.1.3" />
+    <PackageVersion Include="NLog" Version="6.2.0" />
 
     <!-- Active Directory: reines LDAP über System.DirectoryServices.Protocols.
          Kein System.DirectoryServices/AccountManagement — die gehen über
