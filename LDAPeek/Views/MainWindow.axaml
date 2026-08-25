@@ -1,0 +1,460 @@
+<views:ChromeWindow xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:LDAPeek.Views"
+        xmlns:controls="using:LDAPeek.Controls"
+        xmlns:vm="using:LDAPeek.ViewModels"
+        xmlns:models="using:LDAPeek.Models"
+        x:Class="LDAPeek.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="LDAPeek"
+        Width="1240" Height="820"
+        MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource KrosteBackgroundBrush}">
+
+    <DockPanel>
+        <controls:TitleBar DockPanel.Dock="Top" Title="LDAPeek">
+            <controls:TitleBar.Actions>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="SettingsButton" Classes="chrome" Content="⚙"
+                            ToolTip.Tip="Einstellungen" />
+                    <Button x:Name="AboutButton" Classes="chrome" Content="ⓘ"
+                            ToolTip.Tip="Über LDAPeek" />
+                </StackPanel>
+            </controls:TitleBar.Actions>
+        </controls:TitleBar>
+
+        <!-- ============================== Statusleiste ============================== -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource KrosteTitleBarBrush}"
+                BorderBrush="{DynamicResource KrosteBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="14,6">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Text="{Binding StatusText}" Classes="secondary"
+                           FontSize="12" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+
+                <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="120"
+                             Margin="12,0" VerticalAlignment="Center"
+                             IsVisible="{Binding IsBusy}" />
+
+                <TextBlock Grid.Column="2" Text="{Binding ConnectionText}"
+                           Classes="muted" FontSize="11.5" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- ============================== Inhalt ============================== -->
+        <Grid Margin="14,12,14,10" RowDefinitions="Auto,Auto,Auto,*">
+
+            <StackPanel Spacing="2">
+                <TextBlock Text="LDAPeek" Classes="h1" />
+                <TextBlock Classes="muted" FontSize="12"
+                           Text="Active-Directory-Konten nachschlagen — Stammdaten und Gruppenmitgliedschaften, ausschließlich lesend." />
+            </StackPanel>
+
+            <!-- Hinweis auf ein verfügbares Update -->
+            <Border Grid.Row="1" Classes="card" Margin="0,12,0,0"
+                    Background="{DynamicResource KrosteAccentSoftBrush}"
+                    BorderBrush="{DynamicResource KrosteAccentHoverBrush}"
+                    IsVisible="{Binding UpdateNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding UpdateNotice}"
+                           Foreground="{DynamicResource KrosteOnAccentBrush}"
+                           TextWrapping="Wrap" />
+            </Border>
+
+            <!-- Fehlerzeile: inline statt Dialog — sie steht beim Weiterarbeiten
+                 nicht im Weg und bleibt trotzdem sichtbar. -->
+            <Border Grid.Row="2" Classes="card" Margin="0,12,0,0"
+                    Background="{DynamicResource KrosteDangerSoftBrush}"
+                    BorderBrush="{DynamicResource KrosteDangerBrush}"
+                    IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource KrosteTextBrush}"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Classes="ghost" Content="✕"
+                            Command="{Binding DismissErrorCommand}"
+                            ToolTip.Tip="Hinweis ausblenden" />
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="3" Margin="0,12,0,0" ColumnDefinitions="330,6,*">
+
+                <!-- ==================== Suche und Trefferliste ==================== -->
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Classes="card">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="SUCHE" Classes="section-label" />
+
+                            <AutoCompleteBox x:Name="SearchBox"
+                                             Text="{Binding SearchText, Mode=TwoWay}"
+                                             ItemsSource="{Binding RecentSearches}"
+                                             FilterMode="Contains"
+                                             MinimumPrefixLength="1"
+                                             PlaceholderText="🔍  Name, Anmeldename, E-Mail …" />
+
+                            <Button Content="Suchen" Classes="accent"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding SearchCommand}" />
+
+                            <CheckBox Content="Deaktivierte Konten ausblenden"
+                                      IsChecked="{Binding HideDisabledAccounts, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="card-flat" Margin="0,10,0,0" ClipToBounds="True">
+                        <Grid RowDefinitions="Auto,*">
+                            <Border Background="{DynamicResource KrosteHeaderBrush}"
+                                    BorderBrush="{DynamicResource KrosteBorderBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    CornerRadius="8,8,0,0"
+                                    Padding="12,8">
+                                <TextBlock Text="TREFFER" Classes="section-label" Margin="0" />
+                            </Border>
+
+                            <ScrollViewer Grid.Row="1">
+                                <ListBox ItemsSource="{Binding Results}"
+                                         SelectedItem="{Binding SelectedResult, Mode=TwoWay}"
+                                         Margin="0,4">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="models:UserSearchHit">
+                                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                                <TextBlock Text="{Binding BestName}"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <Border Grid.Column="1" Classes="badge danger"
+                                                        IsVisible="{Binding IsDisabled}">
+                                                    <TextBlock Text="deaktiviert" />
+                                                </Border>
+                                                <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+                                                           Text="{Binding SubtitleText}"
+                                                           Classes="muted" FontSize="11.5"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </DockPanel>
+
+                <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+                <!-- ==================== Details und Gruppen ==================== -->
+                <Grid Grid.Column="2" RowDefinitions="*,6,*">
+
+                    <!-- Platzhalter, solange nichts ausgewählt ist -->
+                    <Border Grid.RowSpan="3" Classes="card-flat" IsVisible="{Binding !HasUser}">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
+                            <TextBlock Text="🔍" FontSize="40" HorizontalAlignment="Center" Opacity="0.4" />
+                            <TextBlock Text="Kein Konto ausgewählt" Classes="h2"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Classes="muted" HorizontalAlignment="Center"
+                                       TextAlignment="Center" MaxWidth="380" TextWrapping="Wrap"
+                                       Text="Links nach einem Namen, Anmeldenamen oder einer E-Mail-Adresse suchen und einen Treffer auswählen." />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ========== Stammdaten ========== -->
+                    <Border Classes="card-flat" ClipToBounds="True" IsVisible="{Binding HasUser}">
+                        <Grid RowDefinitions="Auto,*">
+
+                            <Border Background="{DynamicResource KrosteHeaderBrush}"
+                                    BorderBrush="{DynamicResource KrosteBorderBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    CornerRadius="8,8,0,0"
+                                    Padding="14,10">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <!-- Foto liegt am ViewModel (Bitmap ist ein UI-Typ und
+                                         gehört nicht ins AD-Modell), deshalb hier KEIN
+                                         DataContext-Wechsel auf SelectedUser. -->
+                                    <Border Width="44" Height="44" CornerRadius="22"
+                                            ClipToBounds="True" Margin="0,0,12,0"
+                                            Background="{DynamicResource KrosteSurfaceBrush}"
+                                            BorderBrush="{DynamicResource KrosteBorderBrush}"
+                                            BorderThickness="1">
+                                        <Panel>
+                                            <TextBlock Text="👤" FontSize="20" Opacity="0.5"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                            <Image Source="{Binding SelectedUserPhoto}"
+                                                   Stretch="UniformToFill" />
+                                        </Panel>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="{Binding SelectedUser.BestName}" Classes="h2" />
+                                        <TextBlock Text="{Binding SelectedUser.FlagsText}"
+                                                   Classes="muted" FontSize="11.5"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+
+                                    <Border Grid.Column="2" Classes="badge"
+                                            Classes.ok="{Binding SelectedUser.IsHealthy}"
+                                            Classes.danger="{Binding SelectedUser.IsDisabled}"
+                                            Classes.warn="{Binding SelectedUser.IsLockedOut}">
+                                        <TextBlock Text="{Binding SelectedUser.StatusText}" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <ScrollViewer Grid.Row="1" Padding="14,12">
+                                <!-- Ab hier ist der DataContext der Benutzer selbst. Der Wechsel
+                                     sitzt bewusst auf einem eigenen Element ohne weitere
+                                     Bindings: alle Bindings an einem Element werten gegen den
+                                     NEUEN Kontext aus, und ein IsVisible daneben würde still
+                                     ins Leere greifen. -->
+                                <StackPanel Spacing="14"
+                                            DataContext="{Binding SelectedUser}"
+                                            x:DataType="models:AdUser">
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="KONTO" Classes="section-label" />
+                                        <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                                            <TextBlock Text="Anmeldename" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding SamAccountNameText}" />
+
+                                            <TextBlock Grid.Row="1" Text="Benutzerprinzipalname" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding UserPrincipalNameText}" />
+
+                                            <TextBlock Grid.Row="2" Text="E-Mail" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding MailText}" />
+
+                                            <TextBlock Grid.Row="3" Text="Beschreibung" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding DescriptionText}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <Rectangle Classes="divider-h" />
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="ORGANISATION" Classes="section-label" />
+                                        <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                                            <TextBlock Text="Abteilung" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding DepartmentText}" />
+
+                                            <TextBlock Grid.Row="1" Text="Position" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding TitleText}" />
+
+                                            <TextBlock Grid.Row="2" Text="Vorgesetzte Person" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding ManagerText}" />
+
+                                            <TextBlock Grid.Row="3" Text="Büro" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding OfficeText}" />
+
+                                            <TextBlock Grid.Row="4" Text="Personalnummer" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="4" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding EmployeeIdText}" />
+
+                                            <TextBlock Grid.Row="5" Text="Anschrift" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="5" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding AddressText}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <Rectangle Classes="divider-h" />
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="ERREICHBARKEIT" Classes="section-label" />
+                                        <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto">
+                                            <TextBlock Text="Telefon" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding TelephoneText}" />
+
+                                            <TextBlock Grid.Row="1" Text="Mobil" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding MobileText}" />
+
+                                            <TextBlock Grid.Row="2" Text="Durchwahl (IP-Telefon)" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding IpPhoneText}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <Rectangle Classes="divider-h" />
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="ANMELDUNG UND PASSWORT" Classes="section-label" />
+                                        <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                                            <TextBlock Text="Letzte Anmeldung" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding LastLogonText}" />
+
+                                            <TextBlock Grid.Row="1" Text="Passwort gesetzt" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding PasswordLastSetText}" />
+
+                                            <TextBlock Grid.Row="2" Text="Passwort läuft ab" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="field-value"
+                                                                 Classes.warning="{Binding PasswordExpiresSoon}"
+                                                                 Text="{Binding PasswordExpiresText}" />
+
+                                            <TextBlock Grid.Row="3" Text="Konto läuft ab" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding AccountExpiresText}" />
+
+                                            <TextBlock Grid.Row="4" Text="Gesperrt seit" Classes="field-label"
+                                                       IsVisible="{Binding IsLockedOut}" />
+                                            <SelectableTextBlock Grid.Row="4" Grid.Column="1" Classes="field-value warning"
+                                                                 IsVisible="{Binding IsLockedOut}"
+                                                                 Text="{Binding LockedSinceText}" />
+
+                                            <TextBlock Grid.Row="5" Text="Fehlanmeldungen" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="5" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding BadPasswordCountText}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <Rectangle Classes="divider-h" />
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="VERZEICHNIS" Classes="section-label" />
+                                        <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                                            <TextBlock Text="Pfad" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding PathText}" />
+
+                                            <TextBlock Grid.Row="1" Text="Distinguished Name" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="field-value mono"
+                                                                 Text="{Binding DistinguishedName}" />
+
+                                            <TextBlock Grid.Row="2" Text="SID" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="field-value mono"
+                                                                 Text="{Binding SidText}" />
+
+                                            <TextBlock Grid.Row="3" Text="Objekt-GUID" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="field-value mono"
+                                                                 Text="{Binding ObjectGuidText}" />
+
+                                            <TextBlock Grid.Row="4" Text="Angelegt" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="4" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding CreatedText}" />
+
+                                            <TextBlock Grid.Row="5" Text="Zuletzt geändert" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="5" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding ChangedText}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <Rectangle Classes="divider-h" />
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="PROFIL" Classes="section-label" />
+                                        <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto">
+                                            <TextBlock Text="Basisverzeichnis" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding HomeDirectoryText}" />
+
+                                            <TextBlock Grid.Row="1" Text="Anmeldeskript" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding LogonScriptText}" />
+
+                                            <TextBlock Grid.Row="2" Text="Profilpfad" Classes="field-label" />
+                                            <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="field-value"
+                                                                 Text="{Binding ProfilePathText}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+
+                    <GridSplitter Grid.Row="1" ResizeDirection="Rows" IsVisible="{Binding HasUser}" />
+
+                    <!-- ========== Gruppen ========== -->
+                    <Border Grid.Row="2" Classes="card-flat" ClipToBounds="True"
+                            IsVisible="{Binding HasUser}">
+                        <Grid RowDefinitions="Auto,Auto,*">
+
+                            <Border Background="{DynamicResource KrosteHeaderBrush}"
+                                    BorderBrush="{DynamicResource KrosteBorderBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    CornerRadius="8,8,0,0"
+                                    Padding="14,10">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="GRUPPENMITGLIEDSCHAFTEN" Classes="section-label" Margin="0" />
+                                        <TextBlock Text="{Binding GroupSummary}" Classes="secondary" FontSize="12" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                        <ProgressBar IsIndeterminate="True" Width="90"
+                                                     VerticalAlignment="Center"
+                                                     IsVisible="{Binding IsLoadingGroups}" />
+                                        <Button Content="Neu laden" Classes="ghost"
+                                                Command="{Binding RefreshCommand}"
+                                                ToolTip.Tip="Konto und Gruppen erneut abfragen" />
+                                        <Button Content="⧉ Kopieren" Classes="ghost"
+                                                Command="{Binding CopyGroupsCommand}"
+                                                ToolTip.Tip="Angezeigte Gruppen als CSV in die Zwischenablage" />
+                                        <Button Content="CSV" Classes="ghost"
+                                                Command="{Binding ExportGroupsCommand}"
+                                                ToolTip.Tip="Angezeigte Gruppen als CSV-Datei speichern" />
+                                        <Button Content="Bericht" Classes="ghost"
+                                                Command="{Binding CopyUserSummaryCommand}"
+                                                ToolTip.Tip="Vollständige Zusammenfassung in die Zwischenablage" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Row="1" Padding="14,8"
+                                    BorderBrush="{DynamicResource KrosteBorderBrush}"
+                                    BorderThickness="0,0,0,1">
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <TextBox Text="{Binding GroupFilter, Mode=TwoWay}"
+                                             PlaceholderText="🔍  Gruppen filtern …" />
+                                    <CheckBox Grid.Column="1" Margin="12,0,0,0"
+                                              Content="Nur Sicherheitsgruppen"
+                                              ToolTip.Tip="Verteilergruppen ausblenden — sie tragen keine Berechtigungen"
+                                              IsChecked="{Binding SecurityGroupsOnly, Mode=TwoWay}" />
+                                    <CheckBox Grid.Column="2" Margin="12,0,0,0"
+                                              Content="Verschachtelte auflösen"
+                                              ToolTip.Tip="Auch Gruppen zeigen, die der Benutzer über andere Gruppen erbt"
+                                              IsChecked="{Binding IncludeNestedGroups, Mode=TwoWay}" />
+                                </Grid>
+                            </Border>
+
+                            <ScrollViewer Grid.Row="2">
+                                <ListBox ItemsSource="{Binding Groups}" Margin="0,4">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="models:AdGroup">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" />
+
+                                                <Border Grid.Column="1" Classes="badge" Margin="8,0,0,0"
+                                                        Classes.accent="{Binding IsDirect}"
+                                                        Classes.warn="{Binding IsPrimary}">
+                                                    <TextBlock Text="{Binding MembershipText}" />
+                                                </Border>
+
+                                                <Border Grid.Column="2" Classes="badge" Margin="6,0,0,0">
+                                                    <TextBlock Text="{Binding TypeText}" />
+                                                </Border>
+
+                                                <TextBlock Grid.Row="1" Grid.ColumnSpan="3"
+                                                           Text="{Binding SubtitleText}"
+                                                           Classes="muted" FontSize="11.5"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</views:ChromeWindow>

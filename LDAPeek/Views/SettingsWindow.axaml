@@ -1,0 +1,154 @@
+<views:ChromeWindow xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:LDAPeek.Views"
+        xmlns:controls="using:LDAPeek.Controls"
+        xmlns:vm="using:LDAPeek.ViewModels"
+        x:Class="LDAPeek.Views.SettingsWindow"
+        x:DataType="vm:SettingsWindowViewModel"
+        Title="Einstellungen"
+        Width="620" Height="720"
+        MinWidth="560" MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource KrosteBackgroundBrush}">
+
+    <DockPanel>
+        <controls:TitleBar DockPanel.Dock="Top" Title="Einstellungen" />
+
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource KrosteTitleBarBrush}"
+                BorderBrush="{DynamicResource KrosteBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="16,10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Content="Abbrechen" Command="{Binding CancelCommand}" />
+                <Button Content="Speichern" Classes="accent" Command="{Binding SaveCommand}" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Padding="16,14">
+            <StackPanel Spacing="12">
+
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Einstellungen" Classes="h1" />
+                    <TextBlock Classes="muted" FontSize="12"
+                               Text="Verbindung zum Verzeichnis, Suchverhalten und Update-Kanal." />
+                </StackPanel>
+
+                <!-- ==================== Verbindung ==================== -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="VERBINDUNG" Classes="section-label" />
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Domäne oder Domain Controller" Classes="secondary" FontSize="12" />
+                            <TextBox Text="{Binding Server, Mode=TwoWay}"
+                                     PlaceholderText="z. B. lhp.intern oder dc01.lhp.intern" />
+                            <TextBlock Text="{Binding AutoDomainHint}" Classes="muted" FontSize="11" />
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="*,12,Auto" VerticalAlignment="Bottom">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Port" Classes="secondary" FontSize="12" />
+                                <TextBox Text="{Binding Port, Mode=TwoWay}" Width="110"
+                                         HorizontalAlignment="Left" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="2" Content="LDAPS (TLS) verwenden"
+                                      VerticalAlignment="Bottom" Margin="0,0,0,6"
+                                      IsChecked="{Binding UseTls, Mode=TwoWay}" />
+                        </Grid>
+
+                        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                   Text="Ohne LDAPS wird die Sitzung über Kerberos signiert und verschlüsselt — Port 389 ist damit nicht im Klartext unterwegs." />
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Such-Basis (Basis-DN)" Classes="secondary" FontSize="12" />
+                            <TextBox Text="{Binding SearchBase, Mode=TwoWay}"
+                                     Classes="mono"
+                                     PlaceholderText="leer = ganze Domäne" />
+                            <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                       Text="Eine engere Basis (z. B. eine einzelne OU) beschleunigt die Suche spürbar." />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ==================== Anmeldung ==================== -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="ANMELDUNG" Classes="section-label" />
+
+                        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                   Text="Leer lassen, um mit dem angemeldeten Windows-Konto zuzugreifen. Ein abweichendes Konto ist nur nötig, wenn das Alltagskonto nicht lesen darf." />
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Benutzerkonto" Classes="secondary" FontSize="12" />
+                            <TextBox Text="{Binding BindUser, Mode=TwoWay}"
+                                     PlaceholderText="DOMÄNE\benutzer oder benutzer@domäne" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Passwort" Classes="secondary" FontSize="12" />
+                            <TextBox Text="{Binding BindPassword, Mode=TwoWay}"
+                                     PasswordChar="•"
+                                     PlaceholderText="wird mit DPAPI an dieses Windows-Konto gebunden" />
+
+                            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasStoredPassword}">
+                                <TextBlock Classes="muted" FontSize="11" VerticalAlignment="Center"
+                                           Text="Ein Passwort ist hinterlegt. Feld leer lassen = unverändert." />
+                                <Button Grid.Column="1" Classes="ghost" Content="Entfernen"
+                                        Command="{Binding ClearStoredPasswordCommand}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Verbindung testen" Command="{Binding TestConnectionCommand}" />
+                            <ProgressBar IsIndeterminate="True" Width="90" VerticalAlignment="Center"
+                                         IsVisible="{Binding IsBusy}" />
+                        </StackPanel>
+
+                        <Border Classes="card"
+                                IsVisible="{Binding TestResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                Background="{DynamicResource KrosteSurfaceBrush}">
+                            <TextBlock Text="{Binding TestResult}" TextWrapping="Wrap" FontSize="12"
+                                       Classes.warning="{Binding !TestSucceeded}" />
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- ==================== Suche ==================== -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="SUCHE" Classes="section-label" />
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Höchstzahl Treffer" Classes="secondary" FontSize="12" />
+                            <TextBox Text="{Binding SearchLimit, Mode=TwoWay}" Width="110"
+                                     HorizontalAlignment="Left" />
+                        </StackPanel>
+
+                        <CheckBox Content="Verschachtelte Gruppen standardmäßig auflösen"
+                                  IsChecked="{Binding ResolveNestedGroups, Mode=TwoWay}" />
+                        <CheckBox Content="Deaktivierte Konten standardmäßig ausblenden"
+                                  IsChecked="{Binding HideDisabledAccounts, Mode=TwoWay}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ==================== Updates ==================== -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="UPDATES" Classes="section-label" />
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Update-Ordner" Classes="secondary" FontSize="12" />
+                            <TextBox Text="{Binding UpdateChannel, Mode=TwoWay}" Classes="mono" />
+                            <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                       Text="Netzwerkordner mit den Paketen LDAPeek-X.Y.Z-win-x64.zip. Es gewinnt immer die höchste Version, nicht die zuletzt kopierte Datei." />
+                        </StackPanel>
+
+                        <CheckBox Content="Beim Start nach Updates sehen"
+                                  IsChecked="{Binding CheckUpdatesOnStart, Mode=TwoWay}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</views:ChromeWindow>

@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    # LDAPeek zielt auf net10.0-windows — die Tests müssen auf Windows laufen.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # MinVer braucht die volle Historie inkl. Tags
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: Directory.Packages.props
+
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+
+      - name: Tests
+        run: dotnet test --no-build -c Release --logger "trx;LogFileName=test-results.trx"
+
+      # Ohne diesen Schritt steht in der Job-Zusammenfassung eines roten Laufs
+      # nur "Process completed with exit code 1", und das Job-Log liefert die
+      # API nur mit Admin-Rechten am Repo. Annotations sind dagegen öffentlich
+      # lesbar — ohne installiertes gh ist das der einzige Weg, den echten
+      # Testfehler zu sehen.
+      - name: Testfehler als Annotation ausgeben
+        if: failure()
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Recurse -Filter test-results.trx -ErrorAction SilentlyContinue
+          foreach ($file in $files) {
+            [xml]$trx = Get-Content $file.FullName
+            foreach ($result in $trx.TestRun.Results.UnitTestResult) {
+              if ($result.outcome -ne 'Failed') { continue }
+              $message = $result.Output.ErrorInfo.Message
+              $stack = ($result.Output.ErrorInfo.StackTrace -split "`n" | Select-Object -First 1)
+              # Zeilenumbrüche als %0A escapen, sonst bricht die Annotation
+              # nach der ersten Zeile ab.
+              $body = ("$message`n$stack" -replace "`r", '' -replace "`n", '%0A')
+              Write-Host "::error title=$($result.testName)::$body"
+            }
+          }

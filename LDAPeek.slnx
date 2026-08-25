@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="LDAPeek/LDAPeek.csproj" />
+  <Project Path="LDAPeek.Tests/LDAPeek.Tests.csproj" />
+</Solution>
