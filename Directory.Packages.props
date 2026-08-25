@@ -45,16 +45,16 @@
          Kein System.DirectoryServices/AccountManagement — die gehen über
          ADSI/COM, verstecken die tatsächlich angeforderten Attribute und machen
          Range-Retrieval und LDAP_MATCHING_RULE_IN_CHAIN unnötig umständlich. -->
-    <PackageVersion Include="System.DirectoryServices.Protocols" Version="10.0.5" />
+    <PackageVersion Include="System.DirectoryServices.Protocols" Version="10.0.11" />
     <!-- DPAPI für das optionale Dienstkonto-Passwort in den Einstellungen -->
-    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.9" />
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.11" />
 
     <!-- Versionierung -->
     <PackageVersion Include="MinVer" Version="7.0.0" />
 
     <!-- Tests (xunit.v3, NICHT das alte "xunit"-Paket, v2 ist deprecated);
          FluentAssertions NICHT auf 8.x heben (kommerzielle Xceed-Lizenz) -->
-    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3" Version="4.0.0" />
     <PackageVersion Include="FluentAssertions" Version="[7.2.2,8.0.0)" />
   </ItemGroup>
 </Project>
