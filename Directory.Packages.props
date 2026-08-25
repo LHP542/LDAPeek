@@ -19,9 +19,9 @@
          XAML-Aufgabe ist inkrementell) — lokal nach einem Retry unsichtbar,
          im CI jedes Mal rot. Die Gruppenliste ist deshalb eine ListBox mit
          Grid-ItemTemplate. -->
-    <PackageVersion Include="Avalonia" Version="12.1.0" />
+    <PackageVersion Include="Avalonia" Version="12.1.1" />
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.1" />
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.0" />
     <!-- Nur Debug-Builds referenzieren dieses Paket (DevTools) -->
     <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
