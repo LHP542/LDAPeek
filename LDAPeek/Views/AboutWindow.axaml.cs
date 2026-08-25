@@ -13,7 +13,7 @@ namespace LDAPeek.Views;
 [SupportedOSPlatform("windows")]
 public partial class AboutWindow : ChromeWindow
 {
-    private const string GithubUrl = "https://github.com/LHP542/LDAPeek";
+    private const string GithubUrl = "https://github.com/Kroste/LDAPeek";
 
     private static readonly ILogger Log = LogManager.GetCurrentClassLogger();
 
