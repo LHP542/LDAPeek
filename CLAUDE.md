@@ -192,9 +192,26 @@ installiert. Ohne Annotation steht man vor einer Wand.
 
 ### Zugangsprüfung (`AccessPolicy` / `AccessGate`)
 
-Optional: `ldapeek.policy.json` **neben der EXE** (nicht im Benutzerprofil —
-die Regel gehört zur Auslieferung, sonst müsste jeder Nutzer sie sich selbst
-setzen und sie wäre wertlos). Fehlt die Datei, gibt es keine Einschränkung.
+Optional. **Die Gruppe wird beim Bauen einkompiliert** — MSBuild-Property
+`RequiredGroup` → `AssemblyMetadataAttribute("LDAPeek.RequiredGroup")`, im
+Release-Workflow aus der Repo-Variable `LDAPEEK_REQUIRED_GROUP`. Ohne gesetzte
+Gruppe gibt es keine Einschränkung.
+
+**Warum nicht als Datei daneben** (erste Fassung war so, Lars hat es zu Recht
+zerlegt): Eine `ldapeek.policy.json` kann jeder löschen, der sie findet — damit
+läge die Hürde *unter* der, die das Werkzeug ziehen soll. Auszuschließen sind ja
+gerade die, die **keine** LDAP-Abfrage schreiben können; eine JSON-Datei zu
+löschen können sie sehr wohl. Einkompiliert muss man die Assembly dekompilieren
+und patchen, und wer das kann, ist per `Get-ADUser` schneller.
+
+Die Datei existiert weiter, kann aber nur noch den **Hinweistext** liefern
+(kosmetisch) und eine Gruppe nur dann setzen, wenn keine einkompiliert ist.
+Abgesichert in `AccessPolicyTests`: Datei löschen und Datei mit anderer Gruppe
+heben die einkompilierte Regel beide nicht auf.
+
+**Grenze, die bleibt:** Das trägt nur, solange der Nutzer die EXE nicht ersetzen
+kann. In einem benutzerbeschreibbaren Ordner gehört ihm auch das Binary — für
+eine belastbare Regel gehört LDAPeek nach `C:\Program Files\…`.
 
 Zwei Wege, in dieser Reihenfolge:
 

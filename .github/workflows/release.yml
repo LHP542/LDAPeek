@@ -35,6 +35,15 @@ jobs:
       - name: Test
         run: dotnet test LDAPeek.Tests/LDAPeek.Tests.csproj -c Release
 
+      # Die Zugangsgruppe wird ins Binary kompiliert, damit sie zur Laufzeit
+      # nicht änderbar ist. Sie steht in der Repo-Variable
+      # LDAPEEK_REQUIRED_GROUP (Settings → Secrets and variables → Actions →
+      # Variables) — damit taucht der Gruppenname nicht im Quellcode auf und
+      # lässt sich ohne Commit ändern.
+      #
+      # Ist die Variable nicht gesetzt, entsteht ein Paket OHNE Einschränkung.
+      # Das ist Absicht: ein Release soll nicht daran scheitern, aber es soll
+      # auch niemand versehentlich eine falsche Gruppe einbacken.
       - name: Publish (win-x64)
         run: >
           dotnet publish LDAPeek/LDAPeek.csproj
@@ -42,7 +51,18 @@ jobs:
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:Version=${{ steps.ver.outputs.v }}
+          -p:RequiredGroup="${{ vars.LDAPEEK_REQUIRED_GROUP }}"
           -o publish/win-x64
+
+      - name: Zugangsgruppe im Paket protokollieren
+        shell: pwsh
+        run: |
+          $group = "${{ vars.LDAPEEK_REQUIRED_GROUP }}"
+          if ([string]::IsNullOrWhiteSpace($group)) {
+            Write-Host "::warning::LDAPEEK_REQUIRED_GROUP ist nicht gesetzt — das Paket startet OHNE Gruppenbeschränkung."
+          } else {
+            Write-Host "Paket ist auf die Gruppe '$group' beschränkt."
+          }
 
       # Der Dateiname ist Teil der Schnittstelle: der Update-Checker liest die
       # Version daraus (siehe UpdateChannel.ParseVersionFromFileName). Wer ihn

@@ -90,36 +90,47 @@ schnell die direkten Zuweisungen sehen will, schaltet ihn aus.
 LDAPeek kann beim Start prüfen, ob der angemeldete Benutzer in einer bestimmten
 AD-Gruppe ist. Wer nicht drin ist, bekommt einen Hinweis statt des Fensters.
 
-Dazu `ldapeek.policy.json` **neben `LDAPeek.exe`** legen — Vorlage:
-[ldapeek.policy.example.json](ldapeek.policy.example.json).
+**Die Gruppe wird beim Bauen ins Binary geschrieben** — es gibt keine Datei, die
+man löschen könnte:
 
-```json
-{
-  "RequiredGroup": "RG-LDAPeek-Benutzer",
-  "ContactHint": "Zugang bitte beim Team IT-Basis-Dienste (FB 5424) anfragen."
-}
+```bash
+dotnet publish LDAPeek/LDAPeek.csproj -c Release -p:RequiredGroup="RG-LDAPeek-Benutzer"
 ```
 
-- **Fehlt die Datei, gibt es keine Einschränkung** — der Normalfall für
-  Entwicklung und für Installationen ohne Vorgabe.
+Im Release-Workflow kommt der Wert aus der Repo-Variable
+`LDAPEEK_REQUIRED_GROUP` (*Settings → Secrets and variables → Actions →
+Variables*). So steht der Gruppenname nicht im Quellcode und lässt sich ohne
+Commit ändern; ein Gruppenwechsel kostet ein neues Release.
+
+- **Ohne gesetzte Gruppe gibt es keine Einschränkung** — der Normalfall für
+  Entwicklung.
 - `RequiredGroup` nimmt einen Namen (`Gruppe`, `DOMÄNE\Gruppe`) oder eine SID.
   Eine SID ist robuster: sie überlebt eine Umbenennung der Gruppe.
 - **Verschachtelte Mitgliedschaften zählen mit.**
-- Die Datei gehört zur Auslieferung, nicht ins Benutzerprofil. Ein Self-Update
-  überschreibt sie **nicht** — sie bleibt erhalten.
+
+Eine optionale `ldapeek.policy.json` neben der EXE kann den **Hinweistext**
+anpassen (rein kosmetisch, dafür soll niemand neu bauen müssen) — die Gruppe
+kann sie nicht ändern. Nur wenn *keine* Gruppe einkompiliert ist, darf sie auch
+eine setzen. Vorlage:
+[ldapeek.policy.example.json](ldapeek.policy.example.json).
 
 ### Was die Prüfung leistet — und was nicht
 
-Sie ist **kein Sicherheitsmechanismus**. LDAPeek läuft als lokale Anwendung
-unter dem Konto des Nutzers; wer sie starten kann, kann auch diese Datei
-ändern. Und die Daten sind nicht geheim: LDAPeek liest ausschließlich, was
-jedes Domänenkonto ohnehin lesen darf — die tatsächliche Zugriffskontrolle sind
-die Leserechte im Verzeichnis.
+Sie ist **kein Sicherheitsmechanismus**, und die Daten sind nicht geheim:
+LDAPeek liest ausschließlich, was jedes Domänenkonto ohnehin lesen darf — die
+tatsächliche Zugriffskontrolle sind die Leserechte im Verzeichnis.
 
 Der Zweck ist ein anderer und durchaus wirksam: **LDAPeek senkt die
 Einstiegshürde erheblich.** Dieselbe Auskunft per `Get-ADUser` zu holen kann
-zwar jeder — aber eben nicht jeder *kann* es. Die Gruppenregel hält den
-bequemen Weg bei der Zielgruppe, für die das Werkzeug gedacht ist.
+zwar jeder — aber eben nicht jeder *kann* es. Genau deshalb steht die Gruppe im
+Binary und nicht in einer Datei daneben: eine Datei zu löschen können auch die,
+die keine LDAP-Abfrage schreiben können. Wer die Assembly dekompiliert und
+patcht, kommt an dieselbe Auskunft ohnehin schneller über PowerShell.
+
+**Eine Grenze bleibt:** Das gilt nur, solange der Nutzer die EXE nicht ersetzen
+kann. Liegt LDAPeek in einem Ordner, in den er schreiben darf, gehört ihm auch
+das Binary. Für eine belastbare Regel gehört die Anwendung an einen nur für
+Administratoren beschreibbaren Ort, etwa `C:\Program Files\LDAPeek`.
 
 ### Gerade erst in die Gruppe aufgenommen?
 

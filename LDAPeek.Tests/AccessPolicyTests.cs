@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.Versioning;
 using System.Security.Principal;
 using System.Text.Json;
@@ -101,10 +103,126 @@ public class AccessPolicyTests : IDisposable
         var geschrieben = new AccessPolicy { RequiredGroup = "G", ContactHint = "H" };
         File.WriteAllText(PolicyPath, JsonSerializer.Serialize(geschrieben));
 
-        var gelesen = AccessPolicy.Load(PolicyPath);
+        var gelesen = AccessPolicy.Load(PolicyPath, WithoutCompiledGroup);
 
         gelesen.RequiredGroup.Should().Be("G");
         gelesen.ContactHint.Should().Be("H");
+        gelesen.Source.Should().Be(PolicySource.File);
+    }
+
+    // ------------------------------------------------------------------
+    // Rangfolge: einkompilierte Gruppe schlaegt die Datei
+    // ------------------------------------------------------------------
+
+    /// <summary>Eine Assembly ohne das Metadatum — steht fuer einen Build ohne Gruppe.</summary>
+    private static Assembly WithoutCompiledGroup => typeof(AccessPolicyTests).Assembly;
+
+    [Fact]
+    public void Ohne_einkompilierte_Gruppe_entscheidet_die_Datei()
+    {
+        File.WriteAllText(PolicyPath, """{ "RequiredGroup": "AusDerDatei" }""");
+
+        var policy = AccessPolicy.Load(PolicyPath, WithoutCompiledGroup);
+
+        policy.RequiredGroup.Should().Be("AusDerDatei");
+        policy.Source.Should().Be(PolicySource.File);
+    }
+
+    [Fact]
+    public void Die_einkompilierte_Gruppe_gewinnt_gegen_die_Datei()
+    {
+        // Der Kern der Verschaerfung: Wer die Datei aendert, aendert die
+        // geltende Gruppe NICHT.
+        File.WriteAllText(PolicyPath, """{ "RequiredGroup": "MeineEigeneGruppe" }""");
+
+        var policy = AccessPolicy.Load(PolicyPath, TestAssemblies.WithGroup("AusDemBinary"));
+
+        policy.RequiredGroup.Should().Be("AusDemBinary");
+        policy.Source.Should().Be(PolicySource.Assembly);
+    }
+
+    [Fact]
+    public void Das_Loeschen_der_Datei_hebt_die_einkompilierte_Gruppe_nicht_auf()
+    {
+        // Genau der Weg, der bei der dateibasierten Fassung noch funktioniert
+        // haette: Datei weg, Einschraenkung weg.
+        File.Exists(PolicyPath).Should().BeFalse();
+
+        var policy = AccessPolicy.Load(PolicyPath, TestAssemblies.WithGroup("AusDemBinary"));
+
+        policy.IsActive.Should().BeTrue();
+        policy.RequiredGroup.Should().Be("AusDemBinary");
+    }
+
+    [Fact]
+    public void Eine_defekte_Datei_hebt_die_einkompilierte_Gruppe_nicht_auf()
+    {
+        File.WriteAllText(PolicyPath, "{ kaputt");
+
+        var policy = AccessPolicy.Load(PolicyPath, TestAssemblies.WithGroup("AusDemBinary"));
+
+        policy.RequiredGroup.Should().Be("AusDemBinary");
+        policy.IsUnreadable.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Der_Hinweistext_darf_aus_der_Datei_kommen()
+    {
+        // Rein kosmetisch — dafuer soll niemand neu bauen muessen.
+        File.WriteAllText(PolicyPath,
+            """{ "RequiredGroup": "wird-ignoriert", "ContactHint": "Melde dich bei Team X." }""");
+
+        var policy = AccessPolicy.Load(PolicyPath, TestAssemblies.WithGroup("AusDemBinary"));
+
+        policy.RequiredGroup.Should().Be("AusDemBinary");
+        policy.ContactHint.Should().Be("Melde dich bei Team X.");
+    }
+
+    [Fact]
+    public void CompiledRequiredGroup_liest_das_Assembly_Metadatum()
+    {
+        AccessPolicy.CompiledRequiredGroup(TestAssemblies.WithGroup("RG-Test"))
+            .Should().Be("RG-Test");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Ein_leeres_Metadatum_gilt_als_nicht_gesetzt(string wert)
+    {
+        // Der Release-Build setzt die Property immer; ist die Repo-Variable
+        // leer, darf daraus keine unaufloesbare Gruppe werden.
+        AccessPolicy.CompiledRequiredGroup(TestAssemblies.WithGroup(wert)).Should().BeNull();
+    }
+
+    [Fact]
+    public void Ohne_Metadatum_liefert_CompiledRequiredGroup_null() =>
+        AccessPolicy.CompiledRequiredGroup(WithoutCompiledGroup).Should().BeNull();
+}
+
+/// <summary>
+/// Baut zur Laufzeit Assemblies mit einem <see cref="AssemblyMetadataAttribute"/>,
+/// um die einkompilierte Gruppe zu simulieren — sonst liesse sich die Rangfolge
+/// nur mit mehreren Testprojekten prüfen, die jeweils anders gebaut werden.
+/// </summary>
+internal static class TestAssemblies
+{
+    private static readonly Dictionary<string, Assembly> Cache = [];
+
+    public static Assembly WithGroup(string group)
+    {
+        if (Cache.TryGetValue(group, out var vorhanden)) return vorhanden;
+
+        var name = new AssemblyName($"LDAPeek.PolicyProbe.{Cache.Count}");
+        var builder = AssemblyBuilder.DefineDynamicAssembly(name, AssemblyBuilderAccess.Run);
+
+        var ctor = typeof(AssemblyMetadataAttribute)
+            .GetConstructor([typeof(string), typeof(string)])!;
+        builder.SetCustomAttribute(
+            new CustomAttributeBuilder(ctor, [AccessPolicy.MetadataKey, group]));
+
+        Cache[group] = builder;
+        return builder;
     }
 }
 

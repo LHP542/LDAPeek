@@ -8,6 +8,34 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
+  <!-- Zugangsgruppe fest ins Binary.
+
+       Leer = keine Einschränkung (Standard für Entwicklung). Gesetzt wird sie
+       beim Release-Build:
+
+           dotnet publish -p:RequiredGroup="RG-LDAPeek-Benutzer"
+
+       Der Release-Workflow zieht den Wert aus der Repo-Variable
+       LDAPEEK_REQUIRED_GROUP, damit der Gruppenname nicht im Quellcode steht
+       und sich ohne Commit ändern lässt.
+
+       WARUM einkompiliert und nicht als Datei daneben: Eine Datei kann jeder
+       löschen, der sie findet — und damit läge die Hürde unter der, die das
+       Werkzeug ziehen soll. Einkompiliert muss man die Assembly dekompilieren
+       und patchen; wer das kann, holt sich die Auskunft ohnehin direkt per
+       Get-ADUser. Voraussetzung dafür ist allerdings, dass die Anwendung an
+       einem Ort liegt, an dem der Nutzer die EXE nicht ersetzen kann. -->
+  <PropertyGroup>
+    <RequiredGroup Condition="'$(RequiredGroup)' == ''"></RequiredGroup>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(RequiredGroup)' != ''">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>LDAPeek.RequiredGroup</_Parameter1>
+      <_Parameter2>$(RequiredGroup)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
   <ItemGroup>
     <AvaloniaResource Include="Assets/**" />
     <None Update="nlog.config" CopyToOutputDirectory="PreserveNewest" />

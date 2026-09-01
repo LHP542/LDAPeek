@@ -1,25 +1,26 @@
 {
   "_hinweis": [
-    "Vorlage für die optionale Zugangsregel. Zum Aktivieren als",
-    "'ldapeek.policy.json' NEBEN die LDAPeek.exe legen (nicht ins Benutzerprofil).",
-    "Fehlt die Datei, startet LDAPeek ohne Einschränkung.",
-    "Felder mit führendem Unterstrich werden ignoriert."
-  ],
-
-  "RequiredGroup": "RG-LDAPeek-Benutzer",
-
-  "_RequiredGroup": [
-    "Name oder SID der Gruppe, deren Mitglieder LDAPeek starten dürfen.",
-    "Erlaubt sind 'Gruppenname', 'DOMAENE\\Gruppenname' und 'S-1-5-21-...'.",
-    "Eine SID ist robuster: sie überlebt eine Umbenennung der Gruppe und",
-    "spart die Namensauflösung beim Start.",
-    "Verschachtelte Mitgliedschaften zählen mit."
+    "OPTIONAL. Die erforderliche Gruppe wird beim Bauen ins Binary geschrieben",
+    "(-p:RequiredGroup=... bzw. Repo-Variable LDAPEEK_REQUIRED_GROUP) und laesst",
+    "sich mit dieser Datei NICHT aendern — sonst koennte man die Regel durch",
+    "Bearbeiten einer JSON-Datei aushebeln.",
+    "",
+    "Wofuer die Datei trotzdem gut ist:",
+    "  - ContactHint pro Standort anpassen, ohne neu zu bauen (rein kosmetisch).",
+    "  - RequiredGroup setzen, wenn KEINE Gruppe einkompiliert ist (Entwicklung).",
+    "",
+    "Zum Verwenden als 'ldapeek.policy.json' neben die LDAPeek.exe legen.",
+    "Felder mit fuehrendem Unterstrich werden ignoriert."
   ],
 
   "ContactHint": "Zugang bitte beim Team IT-Basis-Dienste (FB 5424) anfragen.",
 
-  "_ContactHint": [
-    "Wird abgewiesenen Nutzern angezeigt. Ohne diesen Satz stehen sie vor",
-    "einem 'Nein' ohne nächsten Schritt."
+  "RequiredGroup": "",
+
+  "_RequiredGroup": [
+    "Greift nur ohne einkompilierte Gruppe. Erlaubt sind 'Gruppenname',",
+    "'DOMAENE\\Gruppenname' und 'S-1-5-21-...'. Eine SID ist robuster: sie",
+    "ueberlebt eine Umbenennung der Gruppe. Verschachtelte Mitgliedschaften",
+    "zaehlen mit."
   ]
 }
