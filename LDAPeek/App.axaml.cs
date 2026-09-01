@@ -36,6 +36,17 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+#if DEBUG
+            // Werkzeugmodus für die Dokumentationsbilder — kein Verzeichnis,
+            // keine Zugangsprüfung, ausschließlich Demodaten.
+            if (ScreenshotTool.OutputDirectory is { } screenshotDir)
+            {
+                _ = ScreenshotTool.RunAsync(this, screenshotDir);
+                base.OnFrameworkInitializationCompleted();
+                return;
+            }
+#endif
+
             _services = BuildServices();
 
             // Zugangsprüfung vor allem anderen. Bewusst nur die Token-Variante:

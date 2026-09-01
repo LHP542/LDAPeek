@@ -31,7 +31,15 @@ public partial class AccessDeniedWindow : ChromeWindow
         InitializeComponent();
     }
 
-    internal AccessDeniedWindow(AccessGate gate, AccessCheckResult result) : this()
+    /// <param name="autoRecheck">
+    /// Beim Öffnen automatisch im Verzeichnis nachfragen. Nur das
+    /// Bildschirmfoto-Werkzeug schaltet das ab: Die Rückfrage prüft gegen die
+    /// <b>echte</b> Windows-Anmeldung und würde die Demodaten im Bild durch den
+    /// tatsächlichen Kontonamen ersetzen — in einem öffentlichen Repository
+    /// genau das, was dort nicht hingehört.
+    /// </param>
+    internal AccessDeniedWindow(AccessGate gate, AccessCheckResult result, bool autoRecheck = true)
+        : this()
     {
         _gate = gate;
         Show(result);
@@ -47,7 +55,7 @@ public partial class AccessDeniedWindow : ChromeWindow
         //
         // Nur wenn das Token die Ursache war — bei einer unauflösbaren Gruppe
         // oder defekter Regel hilft keine Abfrage.
-        if (result.Source == AccessCheckSource.LogonToken)
+        if (autoRecheck && result.Source == AccessCheckSource.LogonToken)
         {
             Opened += async (_, _) => await RunCheckAsync();
         }

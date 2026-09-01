@@ -14,6 +14,17 @@ internal static class Program
     {
         var log = LogManager.GetCurrentClassLogger();
 
+#if DEBUG
+        // Werkzeugmodus für die Dokumentationsbilder. Läuft bewusst am
+        // Single-Instance-Guard vorbei: er soll eine laufende LDAPeek-Instanz
+        // nicht stören und selbst keine beanspruchen.
+        if (ScreenshotTool.TryParse(args))
+        {
+            log.Info("Bildschirmfoto-Modus, Zielordner {0}.", ScreenshotTool.OutputDirectory);
+            return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+#endif
+
         // Zweitstart-Prüfung VOR Avalonia: sonst blitzt kurz ein zweites Fenster
         // auf, bevor es sich wieder beendet.
         var guard = new SingleInstanceGuard();

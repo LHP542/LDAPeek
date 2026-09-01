@@ -9,7 +9,11 @@ Active-Directory-Konten nachschlagen: Stammdaten, Kontozustand und vor allem die
 LDAPeek ist ein **rein lesendes** Werkzeug. Es schreibt nichts ins Verzeichnis,
 und es gibt keinen Codepfad, der das könnte.
 
-![LDAPeek](LDAPeek/Assets/ldapeek.png)
+![LDAPeek](docs/hauptfenster.png)
+
+> Alle Bilder in dieser Datei zeigen **erfundene Daten** aus einer
+> Beispieldomäne. Sie entstehen reproduzierbar aus dem Programm selbst — siehe
+> [Bilder neu erzeugen](#bilder-neu-erzeugen).
 
 ## Wofür
 
@@ -76,6 +80,19 @@ Es genügen die normalen Leserechte, die jedes Domänenkonto im Verzeichnis hat.
 **Minimieren legt LDAPeek in den Infobereich** (Tray), Schließen beendet es. Ein
 zweiter Start holt das laufende Fenster nach vorn, statt ein zweites zu öffnen.
 
+### Die Gruppenliste lesen
+
+Jede Zeile trägt zwei Abzeichen: **woher** die Mitgliedschaft kommt und **was**
+die Gruppe ist.
+
+| Abzeichen | Bedeutung |
+|---|---|
+| `Primärgruppe` (gold) | Aus `primaryGroupID`, typisch „Domänen-Benutzer". Steht in keinem `memberOf`. |
+| `direkt` (blau) | Dem Konto unmittelbar zugewiesen. |
+| `verschachtelt` (grau) | Über eine andere Gruppe geerbt. |
+| `Sicherheit` / `Verteiler` | Nur Sicherheitsgruppen tragen Berechtigungen. |
+| `Global` / `Lokal in Domäne` / `Universell` | Gültigkeitsbereich. |
+
 ### Verschachtelte Gruppen
 
 Der Schalter **Verschachtelte auflösen** steuert, ob geerbte Mitgliedschaften
@@ -132,6 +149,8 @@ kann. Liegt LDAPeek in einem Ordner, in den er schreiben darf, gehört ihm auch
 das Binary. Für eine belastbare Regel gehört die Anwendung an einen nur für
 Administratoren beschreibbaren Ort, etwa `C:\Program Files\LDAPeek`.
 
+![Kein Zugriff](docs/kein-zugriff.png)
+
 ### Gerade erst in die Gruppe aufgenommen?
 
 Windows friert die Gruppenmitgliedschaften beim Anmelden im Zugriffstoken ein —
@@ -145,6 +164,8 @@ Aufnahme gerade eben passiert ist.
 
 Über das Zahnrad in der Titelleiste. Alles ist optional — ohne eine einzige
 Einstellung findet LDAPeek die Anmeldedomäne selbst.
+
+![Einstellungen](docs/einstellungen.png)
 
 | Einstellung | Bedeutung |
 |-------------|-----------|
@@ -197,6 +218,30 @@ dotnet run --project LDAPeek
 
 Release: VS-Code-Task „release (tag + push)" — prüft den Git-Zustand, setzt den
 Tag und stößt die GitHub-Action an, die das ZIP baut.
+
+### Bilder neu erzeugen
+
+Die Bildschirmfotos in dieser Datei entstehen aus dem Programm selbst:
+
+```bash
+dotnet run --project LDAPeek -- --screenshots docs
+```
+
+Der Schalter existiert **nur im Debug-Build**. Er baut die Fenster mit
+erfundenen Daten (`DemoDirectoryService`), rendert sie über Avalonias eigenen
+Renderer in PNG-Dateien und beendet sich — ohne Verzeichniszugriff und ohne
+dass ein Fenster auf dem Bildschirm erscheint.
+
+Zwei Gründe für diesen Weg statt eines Bildschirmabzugs von Hand:
+
+- **Es dürfen keine echten Daten ins Bild.** Dieses Repository ist öffentlich;
+  ein Screenshot aus der Produktivdomäne würde Namen, Telefonnummern und
+  Gruppenmitgliedschaften realer Personen veröffentlichen. Mit erfundenen Daten
+  kann das gar nicht erst passieren.
+- **Fenster von außen abzugreifen** (`PrintWindow`, UI-Automation) sieht für
+  verhaltensbasierte Virenscanner wie eine Fernsteuerung aus und wird
+  blockiert. Außerdem hinge das Ergebnis von Fokus, Skalierung und verdeckenden
+  Fenstern ab.
 
 Details zu Architektur und Fallstricken: [CLAUDE.md](CLAUDE.md).
 
