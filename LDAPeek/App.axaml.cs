@@ -1,7 +1,9 @@
 using System.Runtime.Versioning;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using LDAPeek.Models;
 using LDAPeek.Services;
 using LDAPeek.ViewModels;
 using LDAPeek.Views;
@@ -36,32 +38,95 @@ public partial class App : Application
         {
             _services = BuildServices();
 
-            var mainViewModel = _services.GetRequiredService<MainWindowViewModel>();
-            var window = new MainWindow(mainViewModel, _services);
-            desktop.MainWindow = window;
+            // Zugangsprüfung vor allem anderen. Bewusst nur die Token-Variante:
+            // sie ist synchron und kostet Mikrosekunden, während eine
+            // LDAP-Abfrage hier den Start um Sekunden verzögern würde — und das
+            // im Normalfall, in dem der Nutzer ohnehin berechtigt ist. Die
+            // Rückfrage im Verzeichnis übernimmt das Abweisungsfenster.
+            var gate = _services.GetRequiredService<AccessGate>();
+            var check = gate.CheckToken();
 
-            _tray = new TrayController(this, window);
-            _tray.Install();
-
-            _guard = PendingGuard;
-            if (_guard is not null)
+            // In beiden Zweigen KEIN eigenes Show(): die Desktop-Lifetime zeigt
+            // das gesetzte MainWindow nach dieser Methode selbst. Ein zusätzlicher
+            // Show()-Aufruf lässt "Opened" ein zweites Mal feuern — im
+            // Abweisungsfenster lief die Verzeichnis-Rückfrage dadurch doppelt.
+            if (!check.Granted)
             {
-                _guard.ActivationRequested += (_, _) => _tray?.Restore();
-                _guard.StartListening();
+                ShowAccessDenied(desktop, gate, check);
+                base.OnFrameworkInitializationCompleted();
+                return;
             }
 
-            desktop.Exit += (_, _) =>
-            {
-                Log.Info("LDAPeek wird beendet.");
-                mainViewModel.PersistOnExit();
-                _guard?.Dispose();
-                (_services.GetService<IDirectoryService>() as IDisposable)?.Dispose();
-                _services.Dispose();
-                LogManager.Shutdown();
-            };
+            StartMainWindow(desktop, show: false);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Zeigt das Abweisungsfenster. Bestätigt die dortige Rückfrage den Zugang
+    /// doch noch, startet LDAPeek regulär weiter.
+    /// </summary>
+    private void ShowAccessDenied(
+        IClassicDesktopStyleApplicationLifetime desktop, AccessGate gate, AccessCheckResult check)
+    {
+        // Ohne das würde das Schließen des Abweisungsfensters die Anwendung
+        // beenden, bevor das Hauptfenster überhaupt entstehen kann.
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        var denied = new AccessDeniedWindow(gate, check);
+        desktop.MainWindow = denied;
+
+        denied.Closed += (_, _) =>
+        {
+            if (denied.AccessGranted)
+            {
+                // Hier ist der Startvorgang der Lifetime vorbei — dieses Fenster
+                // muss selbst gezeigt werden.
+                StartMainWindow(desktop, show: true);
+                return;
+            }
+
+            Log.Info("LDAPeek wird ohne Zugang beendet.");
+            Cleanup();
+            desktop.Shutdown();
+        };
+    }
+
+    private void StartMainWindow(IClassicDesktopStyleApplicationLifetime desktop, bool show)
+    {
+        var mainViewModel = _services!.GetRequiredService<MainWindowViewModel>();
+        var window = new MainWindow(mainViewModel, _services!);
+
+        desktop.MainWindow = window;
+        desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+
+        _tray = new TrayController(this, window);
+        _tray.Install();
+
+        _guard = PendingGuard;
+        if (_guard is not null)
+        {
+            _guard.ActivationRequested += (_, _) => _tray?.Restore();
+            _guard.StartListening();
+        }
+
+        desktop.Exit += (_, _) =>
+        {
+            Log.Info("LDAPeek wird beendet.");
+            mainViewModel.PersistOnExit();
+            Cleanup();
+        };
+
+        if (show) window.Show();
+    }
+
+    private void Cleanup()
+    {
+        _guard?.Dispose();
+        (_services?.GetService<IDirectoryService>() as IDisposable)?.Dispose();
+        _services?.Dispose();
+        LogManager.Shutdown();
     }
 
     private static ServiceProvider BuildServices()
@@ -76,6 +141,11 @@ public partial class App : Application
 
         services.AddSingleton<IDirectoryService, DirectoryService>();
         services.AddSingleton<UpdateService>();
+
+        // Zugangsregel liegt neben der EXE und gehört zur Auslieferung, nicht
+        // zum Benutzerprofil — siehe AccessPolicy.
+        services.AddSingleton(AccessPolicy.Load());
+        services.AddSingleton<AccessGate>();
 
         services.AddSingleton<MainWindowViewModel>();
         services.AddTransient<SettingsWindowViewModel>();

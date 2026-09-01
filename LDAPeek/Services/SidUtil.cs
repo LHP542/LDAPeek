@@ -1,5 +1,7 @@
 using System.Buffers.Binary;
 using System.Globalization;
+using System.Runtime.Versioning;
+using System.Security.Principal;
 using System.Text;
 
 namespace LDAPeek.Services;
@@ -116,4 +118,28 @@ internal static class SidUtil
         guid.Length == 16
             ? new Guid(guid).ToString("D", CultureInfo.InvariantCulture)
             : null;
+
+    /// <summary>
+    /// Wandelt eine SID in Textform (<c>S-1-5-21-…</c>) zurück in Bytes — nötig,
+    /// um sie in einem <c>(objectSid=…)</c>-Filter zu verwenden.
+    /// Liefert <c>null</c>, wenn der Text keine gültige SID ist.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    public static byte[]? FromStringSid(string? sid)
+    {
+        if (string.IsNullOrWhiteSpace(sid)) return null;
+
+        try
+        {
+            var parsed = new SecurityIdentifier(sid.Trim());
+            var bytes = new byte[parsed.BinaryLength];
+            parsed.GetBinaryForm(bytes, 0);
+            return bytes;
+        }
+        catch (ArgumentException)
+        {
+            // Kein SID-Format — der Aufrufer behandelt den Wert dann als Namen.
+            return null;
+        }
+    }
 }

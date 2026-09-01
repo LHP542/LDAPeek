@@ -72,6 +72,8 @@ Was gebaut ist:
 - **Einstellungen** mit Verbindungstest, DPAPI-geschütztem optionalem Bind-Konto.
 - **Tray** (Minimieren → Tray), **Single-Instance-Guard**, **Über-Fenster** mit
   echtem Self-Update gegen den Ordner-Kanal.
+- **Optionale Gruppenbeschränkung beim Start** (`ldapeek.policy.json` neben der
+  EXE, fehlt = keine Einschränkung).
 
 Live gemessen am 2026-08-25 (eigenes Konto, `LHP.INTERN`):
 Bind 41 ms · Suche 1,6 s · Detailabfrage 8 ms · 33 direkte Gruppen ·
@@ -187,6 +189,38 @@ erzeugt eine `::error title=…::`-Annotation mit Testname und Assertion-Meldung
 Das ist hier nicht optional: das Job-Log liefert die GitHub-API nur mit
 Admin-Rechten am Repo (403), und `gh` ist auf dem Arbeitslaptop nicht
 installiert. Ohne Annotation steht man vor einer Wand.
+
+### Zugangsprüfung (`AccessPolicy` / `AccessGate`)
+
+Optional: `ldapeek.policy.json` **neben der EXE** (nicht im Benutzerprofil —
+die Regel gehört zur Auslieferung, sonst müsste jeder Nutzer sie sich selbst
+setzen und sie wäre wertlos). Fehlt die Datei, gibt es keine Einschränkung.
+
+Zwei Wege, in dieser Reihenfolge:
+
+1. **Anmeldetoken** (`WindowsIdentity.Groups`) — synchron, ~5 ms, deckt
+   verschachtelte Gruppen und die Primärgruppe ab, funktioniert ohne Netz. Läuft
+   in `OnFrameworkInitializationCompleted`, damit der Normalfall den Start nicht
+   verzögert.
+2. **LDAP-Rückfrage**, nur bei einem Nein und automatisch beim Öffnen des
+   Abweisungsfensters. Das Token ist seit der Anmeldung eingefroren; eine frische
+   Gruppenaufnahme steht dort nicht drin. Der Filter fragt umgekehrt
+   (`GroupHasMemberRecursive`: „hat Gruppe X das Konto als Mitglied?") — eine
+   Abfrage mit höchstens einem Treffer, gemessen ~10 ms, statt alle Gruppen des
+   Kontos zu holen.
+
+**Ein Nein ist immer ein Nein:** unauflösbare Gruppe, defekte Regeldatei oder
+nicht erreichbares Verzeichnis führen zur Sperre, nicht zum Durchlassen — sonst
+ließe sich die Regel durch einen Tippfehler oder das Zerstören einer Datei
+aushebeln. Abgesichert in `AccessPolicyTests`/`AccessGateTests`.
+
+**Falle beim Fensterwechsel:** In `App` darf im Startpfad **kein** eigenes
+`Show()` stehen — die Desktop-Lifetime zeigt das gesetzte `MainWindow` nach
+`OnFrameworkInitializationCompleted` selbst. Mit zusätzlichem `Show()` feuert
+`Opened` zweimal, und die Verzeichnis-Rückfrage lief doppelt (im Log an zwei
+Prüfungen im Abstand von 8 s zu sehen). Wird das Hauptfenster dagegen **nach**
+dem Abweisungsfenster gestartet, ist der Startvorgang vorbei und `Show()` ist
+Pflicht — dafür der `show`-Parameter an `StartMainWindow`.
 
 ### Nicht anfassen ohne Grund
 

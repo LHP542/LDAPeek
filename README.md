@@ -45,6 +45,8 @@ hineingekommen ist:
 - **Weitergeben** — Gruppenliste als CSV in die Zwischenablage oder als Datei,
   oder eine vollständige Textzusammenfassung des Kontos für ein Ticket.
 - **Update über den Netzwerkordner** — kein Internetzugang nötig.
+- **Optionale Gruppenbeschränkung** — der Start lässt sich an eine
+  AD-Gruppenmitgliedschaft koppeln.
 
 ## Installation
 
@@ -82,6 +84,51 @@ ist. Die Abfrage läuft serverseitig
 (`LDAP_MATCHING_RULE_IN_CHAIN`) und dauert je nach Verschachtelungstiefe ein
 paar Sekunden — bei einem Konto mit 132 effektiven Gruppen etwa vier. Wer nur
 schnell die direkten Zuweisungen sehen will, schaltet ihn aus.
+
+## Start auf eine Gruppe beschränken (optional)
+
+LDAPeek kann beim Start prüfen, ob der angemeldete Benutzer in einer bestimmten
+AD-Gruppe ist. Wer nicht drin ist, bekommt einen Hinweis statt des Fensters.
+
+Dazu `ldapeek.policy.json` **neben `LDAPeek.exe`** legen — Vorlage:
+[ldapeek.policy.example.json](ldapeek.policy.example.json).
+
+```json
+{
+  "RequiredGroup": "RG-LDAPeek-Benutzer",
+  "ContactHint": "Zugang bitte beim Team IT-Basis-Dienste (FB 5424) anfragen."
+}
+```
+
+- **Fehlt die Datei, gibt es keine Einschränkung** — der Normalfall für
+  Entwicklung und für Installationen ohne Vorgabe.
+- `RequiredGroup` nimmt einen Namen (`Gruppe`, `DOMÄNE\Gruppe`) oder eine SID.
+  Eine SID ist robuster: sie überlebt eine Umbenennung der Gruppe.
+- **Verschachtelte Mitgliedschaften zählen mit.**
+- Die Datei gehört zur Auslieferung, nicht ins Benutzerprofil. Ein Self-Update
+  überschreibt sie **nicht** — sie bleibt erhalten.
+
+### Was die Prüfung leistet — und was nicht
+
+Sie ist **kein Sicherheitsmechanismus**. LDAPeek läuft als lokale Anwendung
+unter dem Konto des Nutzers; wer sie starten kann, kann auch diese Datei
+ändern. Und die Daten sind nicht geheim: LDAPeek liest ausschließlich, was
+jedes Domänenkonto ohnehin lesen darf — die tatsächliche Zugriffskontrolle sind
+die Leserechte im Verzeichnis.
+
+Der Zweck ist ein anderer und durchaus wirksam: **LDAPeek senkt die
+Einstiegshürde erheblich.** Dieselbe Auskunft per `Get-ADUser` zu holen kann
+zwar jeder — aber eben nicht jeder *kann* es. Die Gruppenregel hält den
+bequemen Weg bei der Zielgruppe, für die das Werkzeug gedacht ist.
+
+### Gerade erst in die Gruppe aufgenommen?
+
+Windows friert die Gruppenmitgliedschaften beim Anmelden im Zugriffstoken ein —
+eine frische Aufnahme steht dort noch nicht drin. LDAPeek fängt das ab: wird der
+Zugang anhand des Tokens verweigert, **fragt es automatisch noch einmal direkt
+im Verzeichnis nach** (dauert Millisekunden). Erst wenn auch das verneint,
+erscheint die Abweisung — mit einem „Erneut prüfen"-Knopf für den Fall, dass die
+Aufnahme gerade eben passiert ist.
 
 ## Einstellungen
 

@@ -1,0 +1,25 @@
+{
+  "_hinweis": [
+    "Vorlage für die optionale Zugangsregel. Zum Aktivieren als",
+    "'ldapeek.policy.json' NEBEN die LDAPeek.exe legen (nicht ins Benutzerprofil).",
+    "Fehlt die Datei, startet LDAPeek ohne Einschränkung.",
+    "Felder mit führendem Unterstrich werden ignoriert."
+  ],
+
+  "RequiredGroup": "RG-LDAPeek-Benutzer",
+
+  "_RequiredGroup": [
+    "Name oder SID der Gruppe, deren Mitglieder LDAPeek starten dürfen.",
+    "Erlaubt sind 'Gruppenname', 'DOMAENE\\Gruppenname' und 'S-1-5-21-...'.",
+    "Eine SID ist robuster: sie überlebt eine Umbenennung der Gruppe und",
+    "spart die Namensauflösung beim Start.",
+    "Verschachtelte Mitgliedschaften zählen mit."
+  ],
+
+  "ContactHint": "Zugang bitte beim Team IT-Basis-Dienste (FB 5424) anfragen.",
+
+  "_ContactHint": [
+    "Wird abgewiesenen Nutzern angezeigt. Ohne diesen Satz stehen sie vor",
+    "einem 'Nein' ohne nächsten Schritt."
+  ]
+}

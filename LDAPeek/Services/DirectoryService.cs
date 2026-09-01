@@ -112,6 +112,45 @@ public sealed class DirectoryService : IDirectoryService, IDisposable
     }
 
     // ------------------------------------------------------------------
+    // Zugangsprüfung
+    // ------------------------------------------------------------------
+
+    public Task<bool> IsMemberOfGroupAsync(
+        string samAccountName, byte[] groupSid, CancellationToken cancellationToken)
+    {
+        return WithConnectionAsync((connection, info) =>
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            // Erst den DN des Kontos holen — die Matching-Rule vergleicht gegen
+            // den DN, nicht gegen den Anmeldenamen.
+            var userRequest = new SearchRequest(info.SearchBase,
+                LdapFilter.UserBySamAccountName(samAccountName),
+                SearchScope.Subtree, AdAttributes.DistinguishedName);
+            var userResponse = (SearchResponse)connection.SendRequest(userRequest, RequestTimeout);
+
+            if (userResponse.Entries.Count == 0)
+            {
+                Log.Warn("Konto {0} im Verzeichnis nicht gefunden — Mitgliedschaft nicht prüfbar.",
+                    samAccountName);
+                return false;
+            }
+
+            string userDn = userResponse.Entries[0].DistinguishedName;
+
+            var request = new SearchRequest(info.SearchBase,
+                LdapFilter.GroupHasMemberRecursive(groupSid, userDn),
+                SearchScope.Subtree, AdAttributes.CommonName);
+            var response = (SearchResponse)connection.SendRequest(request, RequestTimeout);
+
+            bool member = response.Entries.Count > 0;
+            Log.Debug("Mitgliedschaftsprüfung für {0}: {1} ({2} ms).",
+                samAccountName, member ? "Mitglied" : "kein Mitglied", stopwatch.ElapsedMilliseconds);
+            return member;
+        }, cancellationToken);
+    }
+
+    // ------------------------------------------------------------------
     // Benutzerdetails
     // ------------------------------------------------------------------
 

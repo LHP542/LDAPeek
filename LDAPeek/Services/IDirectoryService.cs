@@ -33,6 +33,20 @@ public interface IDirectoryService
         AdUser user, bool includeNested, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Prüft, ob <paramref name="samAccountName"/> — auch über Verschachtelung —
+    /// Mitglied der Gruppe mit dieser SID ist.
+    ///
+    /// Die Frage wird bewusst so herum gestellt: der Domain Controller
+    /// beantwortet sie mit einer Abfrage, die höchstens ein Objekt liefert,
+    /// statt erst alle Gruppen des Kontos zu holen.
+    ///
+    /// Nicht erfasst: die Primärgruppe (sie steht in keinem <c>member</c>).
+    /// Für eine Zugriffsgruppe ohne Belang.
+    /// </summary>
+    Task<bool> IsMemberOfGroupAsync(
+        string samAccountName, byte[] groupSid, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Verwirft die bestehende Verbindung. Nach einer Änderung an Server, Port
     /// oder Anmeldedaten Pflicht, sonst arbeitet das Werkzeug weiter gegen die
     /// alte Sitzung und die neue Einstellung wirkt scheinbar nicht.

@@ -115,6 +115,22 @@ internal static class LdapFilter
     public static string GroupsOfMemberRecursive(string userDn) =>
         $"(&(objectCategory=group)(member:1.2.840.113556.1.4.1941:={Escape(userDn)}))";
 
+    /// <summary>
+    /// Filter, der genau dann einen Treffer liefert, wenn die Gruppe mit dieser
+    /// SID <paramref name="userDn"/> als — auch verschachteltes — Mitglied hat.
+    ///
+    /// Die Frage „ist X in Gruppe Y?" so herum zu stellen ist deutlich billiger,
+    /// als alle Gruppen von X zu holen und zu durchsuchen: der DC beantwortet
+    /// sie mit einer Abfrage, die höchstens ein Objekt zurückgibt.
+    ///
+    /// Nicht erfasst: die <b>Primärgruppe</b>. Sie steht in keinem
+    /// <c>member</c>-Attribut. Für eine Zugriffsgruppe ist das ohne Belang —
+    /// niemand vergibt Rechte über „Domänen-Benutzer".
+    /// </summary>
+    public static string GroupHasMemberRecursive(ReadOnlySpan<byte> groupSid, string userDn) =>
+        $"(&(objectCategory=group)(objectSid={EscapeBinary(groupSid)})"
+        + $"(member:1.2.840.113556.1.4.1941:={Escape(userDn)}))";
+
     /// <summary>Filter auf ein Objekt per Distinguished Name (Base-Suche).</summary>
     public static string AnyObject() => "(objectClass=*)";
 }
