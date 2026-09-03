@@ -116,6 +116,9 @@ internal sealed class DemoDirectoryService : IDirectoryService
     public Task<IReadOnlyList<AdGroup>> LoadGroupsAsync(
         AdUser user, bool includeNested, CancellationToken cancellationToken)
     {
+        // Das Arbeitsplatzprofil AP-FB42 ist Mitglied der Ressourcengruppen —
+        // genau so entsteht im Verzeichnis eine geerbte Mitgliedschaft, und
+        // genau diese Kanten (memberOf der Gruppe) spannen den Baum auf.
         IReadOnlyList<AdGroup> groups =
         [
             Group("Domänen-Benutzer", MembershipKind.Primary, GroupScope.Global,
@@ -125,13 +128,20 @@ internal sealed class DemoDirectoryService : IDirectoryService
             Group("RG-Drucker-Rathaus-2OG", MembershipKind.Direct, GroupScope.Global,
                 "Druckerfreigabe 2. Obergeschoss"),
             Group("AP-FB42", MembershipKind.Direct, GroupScope.Global,
-                "Arbeitsplatzprofil Fachbereich 42"),
+                "Arbeitsplatzprofil Fachbereich 42",
+                memberOf:
+                [
+                    "RG-Fachverfahren-Beispiel-Bearbeiten",
+                    "RG-FS-FB42-Vorlagen-Lesen",
+                    "RG-Intranet-Redaktion",
+                    "Verteiler-FB42-Alle",
+                ]),
             Group("RG-Fachverfahren-Beispiel-Bearbeiten", MembershipKind.Nested, GroupScope.Global,
-                "über AP-FB42 geerbt"),
+                "Bearbeiten im Fachverfahren", memberOf: ["RG-Intranet-Redaktion"]),
             Group("RG-FS-FB42-Vorlagen-Lesen", MembershipKind.Nested, GroupScope.DomainLocal,
-                "über AP-FB42 geerbt"),
+                "Lesezugriff auf die Vorlagenablage"),
             Group("RG-Intranet-Redaktion", MembershipKind.Nested, GroupScope.Universal,
-                "über RG-Fachverfahren-Beispiel-Bearbeiten geerbt"),
+                "Redaktionsrechte im Intranet"),
             Group("Verteiler-FB42-Alle", MembershipKind.Nested, GroupScope.Universal,
                 "E-Mail-Verteiler", GroupKind.Distribution),
         ];
@@ -145,16 +155,19 @@ internal sealed class DemoDirectoryService : IDirectoryService
 
     private static AdGroup Group(
         string name, MembershipKind membership, GroupScope scope, string description,
-        GroupKind kind = GroupKind.Security) => new()
+        GroupKind kind = GroupKind.Security, string[]? memberOf = null) => new()
         {
-            DistinguishedName = $"CN={name},OU=Gruppen,DC=musterstadt,DC=beispiel",
+            DistinguishedName = Dn(name),
             Name = name,
             SamAccountName = name,
             Description = description,
             Scope = scope,
             Kind = kind,
             Membership = membership,
+            MemberOfDns = memberOf is null ? [] : [.. memberOf.Select(Dn)],
         };
+
+    private static string Dn(string name) => $"CN={name},OU=Gruppen,DC=musterstadt,DC=beispiel";
 
     public Task<bool> IsMemberOfGroupAsync(
         string samAccountName, byte[] groupSid, CancellationToken cancellationToken) =>

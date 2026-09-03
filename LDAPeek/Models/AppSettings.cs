@@ -56,6 +56,12 @@ public sealed class AppSettings
     public bool HideDisabledAccounts { get; set; }
 
     /// <summary>
+    /// Gliederung der Gruppenliste. Standard ist der Verschachtelungsbaum: Er
+    /// beantwortet die Frage, wegen der man das Fenster geöffnet hat.
+    /// </summary>
+    public GroupViewMode GroupView { get; set; } = GroupViewMode.Nesting;
+
+    /// <summary>
     /// Update-Kanal. Ein UNC-Pfad oder lokaler Ordner wird als Ordner-Kanal
     /// erkannt, alles mit http(s) als Adresse — der Kanaltyp ergibt sich aus der
     /// Schreibweise, es gibt bewusst keinen zweiten Schalter dafür.
@@ -104,6 +110,7 @@ public sealed class AppSettings
         SearchLimit = SearchLimit,
         ResolveNestedGroups = ResolveNestedGroups,
         HideDisabledAccounts = HideDisabledAccounts,
+        GroupView = GroupView,
         UpdateChannel = UpdateChannel,
         CheckUpdatesOnStart = CheckUpdatesOnStart,
         RecentSearches = [.. RecentSearches],

@@ -23,6 +23,15 @@ public sealed class AdGroup
     public GroupKind Kind { get; init; }
     public MembershipKind Membership { get; set; }
 
+    /// <summary>
+    /// Die Gruppen, in denen <b>diese Gruppe</b> Mitglied ist. Daraus entsteht
+    /// der Verschachtelungsbaum, und zwar ohne eine einzige zusätzliche
+    /// Abfrage: <c>LDAP_MATCHING_RULE_IN_CHAIN</c> liefert die vollständige
+    /// Kette, also ist jede Zwischengruppe ohnehin im Ergebnis. Ihre
+    /// <c>memberOf</c>-Werte sind damit genau die Kanten des Baums.
+    /// </summary>
+    public IReadOnlyList<string> MemberOfDns { get; init; } = [];
+
     /// <summary>Anzeigename mit Rückfall auf DN, falls die Gruppe kein cn geliefert hat.</summary>
     public string DisplayName =>
         Name ?? SamAccountName ?? AdValue.FriendlyNameFromDn(DistinguishedName) ?? DistinguishedName;
@@ -56,6 +65,44 @@ public sealed class AdGroup
 
     /// <summary>Zusammenfassung von Art und Bereich für den Eintrag.</summary>
     public string TypeText => $"{KindText} · {ScopeText}";
+
+    // ------------------------------------------------------------------
+    // Abzeichen in der Liste. Der Grundsatz: zeigen, was von der Regel
+    // abweicht. Bei 130 Zeilen, in denen dreimal dasselbe steht, liest man
+    // keine davon mehr — und übersieht die eine, die anders ist.
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Herkunft nur bei „direkt" und „Primärgruppe" zeigen. In einer
+    /// aufgelösten Liste ist „verschachtelt" der Normalfall, und im Baum sagt
+    /// die Einrückung es ohnehin.
+    /// </summary>
+    public bool ShowMembershipBadge => Membership != MembershipKind.Nested;
+
+    /// <summary>
+    /// Art und Bereich nur zeigen, wenn sie vom Üblichen abweichen: Eine
+    /// globale Sicherheitsgruppe ist der Regelfall und braucht kein Etikett.
+    /// Eine Verteilergruppe dagegen trägt keine Rechte — das ist die
+    /// Information, auf die es ankommt.
+    /// </summary>
+    public bool ShowTypeBadge => Kind != GroupKind.Security || Scope != GroupScope.Global;
+
+    /// <summary>Kurzform von <see cref="TypeText"/>: nennt nur das Abweichende.</summary>
+    public string TypeBadgeText
+    {
+        get
+        {
+            var parts = new List<string>(2);
+            if (Kind != GroupKind.Security) parts.Add(KindText);
+            if (Scope != GroupScope.Global) parts.Add(ScopeText);
+            return parts.Count == 0 ? TypeText : string.Join(" · ", parts);
+        }
+    }
+
+    /// <summary>Volltext für den Tooltip — dort darf alles stehen.</summary>
+    public string TooltipText => string.Join('\n',
+        new[] { DisplayName, Description, $"{MembershipText} · {TypeText}", DistinguishedName }
+            .Where(line => !string.IsNullOrWhiteSpace(line)));
 
     /// <summary>Ein Zeile für den Zwischenablage-/CSV-Export.</summary>
     public string ToCsvRow() => string.Join(';',

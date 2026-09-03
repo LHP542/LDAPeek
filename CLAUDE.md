@@ -54,7 +54,7 @@ grün bleiben (der Runner kommt an nuget.org heran).
 
 ## Aktueller Stand
 
-**v0.1.0, 2026-08-25** — vollständig funktionsfähig, 196 Tests grün, gegen die
+**v0.1.0, 2026-08-25** — vollständig funktionsfähig, 245 Tests grün, gegen die
 Produktivdomäne `LHP.INTERN` (DC03) verifiziert.
 
 Was gebaut ist:
@@ -66,7 +66,9 @@ Was gebaut ist:
   `thumbnailPhoto`, Statusabzeichen und Klartext der `userAccountControl`-Flags.
 - **Gruppenliste** mit Herkunftskennzeichnung (Primärgruppe / direkt /
   verschachtelt), Volltextfilter, Schalter „nur Sicherheitsgruppen" und
-  „verschachtelte auflösen".
+  „verschachtelte auflösen". Drei umschaltbare Gliederungen (`GroupTree`):
+  **Baum** entlang der Verschachtelung, **Verzeichnis** nach OU, **flach**.
+  Abzeichen erscheinen nur, wenn sie vom Normalfall abweichen.
 - **Export**: Gruppen als CSV (Zwischenablage oder Datei, UTF-8 mit BOM),
   Konto als Textbericht.
 - **Einstellungen** mit Verbindungstest, DPAPI-geschütztem optionalem Bind-Konto.
@@ -75,10 +77,11 @@ Was gebaut ist:
 - **Optionale Gruppenbeschränkung beim Start** (`ldapeek.policy.json` neben der
   EXE, fehlt = keine Einschränkung).
 
-Live gemessen am 2026-08-25 (eigenes Konto, `LHP.INTERN`):
-Bind 41 ms · Suche 1,6 s · Detailabfrage 8 ms · 33 direkte Gruppen ·
-132 effektive (99 geerbt) in 4,0 s · Primärgruppe „Domänen-Benutzer" korrekt
-aus `primaryGroupID` hergeleitet.
+Live gemessen am 2026-09-03 (eigenes Konto, `LHP.INTERN`, nach dem
+`EntryReader`-Fix): Bind 103 ms · Detailabfrage 19 ms · 34 direkte Gruppen ·
+134 effektive (99 geerbt) in 3,3 s · Baum daraus: 35 Wurzeln, Tiefe 6, keine
+Gruppe doppelt oder verloren · Primärgruppe „Domänen-Benutzer" korrekt aus
+`primaryGroupID` hergeleitet.
 
 ## Roadmap
 
@@ -87,11 +90,6 @@ Nichts davon ist zugesagt — Kandidaten, die beim Bauen aufgefallen sind:
 - **Rückwärtssuche: Mitglieder einer Gruppe.** Die naheliegende Ergänzung
   („wer ist alles in X?"). Braucht dieselbe Range-Retrieval-Behandlung auf
   `member` statt `memberOf` — die Bausteine liegen schon in `RangeRetrieval`.
-- **Verschachtelungspfad anzeigen.** Aktuell steht bei einer geerbten Gruppe
-  nur „verschachtelt", nicht *worüber*. `LDAP_MATCHING_RULE_IN_CHAIN` liefert
-  den Pfad nicht mit; das hieße, den Baum clientseitig nachzubauen (pro Gruppe
-  eine Abfrage auf `memberOf`, mit Zyklenschutz). Erst bauen, wenn es jemand
-  wirklich braucht.
 - **Gruppen zweier Konten vergleichen.** „Warum kann A das und B nicht?" ist die
   zweithäufigste Frage nach der, die LDAPeek schon beantwortet.
 - **Computerkonten und Dienstkonten** — derzeit filtert
@@ -107,10 +105,12 @@ Nichts davon ist zugesagt — Kandidaten, die beim Bauen aufgefallen sind:
 
 ```
 LDAPeek/
-  Models/       AdUser, AdGroup, UserSearchHit, AppSettings, Display, Enums
+  Models/       AdUser, AdGroup, UserSearchHit, AppSettings, Display, Enums,
+                GroupNode, GroupViewMode
   Services/     DirectoryService (LDAP), LdapFilter, AdValue, SidUtil,
-                RangeRetrieval, EntryReader, SettingsService, JsonFileStore,
-                SecretProtection, UpdateService, UpdateChannel, UserReport
+                RangeRetrieval, EntryReader, GroupTree, SettingsService,
+                JsonFileStore, SecretProtection, UpdateService, UpdateChannel,
+                UserReport
   ViewModels/   MainWindowViewModel (+ .Groups.cs), SettingsWindowViewModel
   Views/        ChromeWindow, MainWindow, SettingsWindow, AboutWindow,
                 TrayController, SingleInstanceGuard, GlobalExceptionHandler
@@ -119,8 +119,31 @@ LDAPeek/
 ```
 
 Die Geschäftslogik liegt vollständig in `Services/`; die ViewModels
-orchestrieren nur. Deshalb sind 196 Tests ohne laufende Domäne und ohne
+orchestrieren nur. Deshalb sind 245 Tests ohne laufende Domäne und ohne
 Headless-Avalonia möglich.
+
+### Der Verschachtelungsbaum kostet keine einzige Zusatzabfrage
+
+Die Roadmap hatte „Verschachtelungspfad anzeigen" als teuer eingeschätzt (eine
+`memberOf`-Abfrage pro Gruppe). Das stimmt nicht: `LDAP_MATCHING_RULE_IN_CHAIN`
+liefert die **transitive Hülle**, also ist jede Zwischengruppe ohnehin im
+Ergebnis. `memberOf` im `GroupSet` macht deren Kanten mit — der Baum entsteht
+danach rein clientseitig (`Services/GroupTree.cs`).
+
+**Die Richtung ist die Stolperstelle**, und sie ist beim ersten Anlauf hier
+falsch herum implementiert *und* falsch herum getestet worden (Test grün,
+Ergebnis flach — aufgefallen erst gegen die echte Domäne): Unter einer Gruppe
+steht, was sie **einbringt**. Ist die Rollengruppe `AP_54` Mitglied der
+Ressourcengruppe `RG-Ablage`, erbt jedes Mitglied von `AP_54` die Rechte von
+`RG-Ablage` — `RG-Ablage` gehört also **unter** `AP_54`, und das steht in
+`AP_54.memberOf`. Die Kinder eines Knotens sind seine eigenen `memberOf`-Werte,
+nicht die Gruppen, die ihn als Mitglied führen. Deshalb heißt der Testparameter
+`bringt` und nicht `memberOf`.
+
+Weil Mitgliedschaften ein Geflecht bilden und keinen Baum, hängt jede Gruppe am
+**kürzesten** Weg (Breitensuche von den direkten Mitgliedschaften aus); weitere
+Wege stehen als „auch über …" daneben. Jeden Weg einzeln aufzuklappen erzeugt
+aus 134 Gruppen mehrere hundert Zeilen und macht die Ansicht wieder kaputt.
 
 ### Warum System.DirectoryServices.Protocols und nicht AccountManagement
 
@@ -129,20 +152,29 @@ tatsächlich angeforderten Attribute und machen genau die zwei Dinge umständlic
 auf die es hier ankommt: Range-Retrieval und `LDAP_MATCHING_RULE_IN_CHAIN`.
 Nicht „zurückvereinfachen".
 
-### Die drei Fallen im AD-Zugriff
+### Die vier Fallen im AD-Zugriff
 
-Alle drei scheitern **still** — leere Liste statt Fehlermeldung:
+Alle vier scheitern **still** — leere Liste statt Fehlermeldung:
 
-1. **Range-Retrieval** (`Services/RangeRetrieval.cs`). Ab ~1500 Werten liefert
+1. **Mehrwertige Attribute kommen als `byte[]`** (`Services/EntryReader.cs`).
+   `DirectoryAttribute` erbt von `CollectionBase`; ein `foreach` darüber liefert
+   die **Rohwerte**, nur der Indexer wandelt nach Text. Eine Schleife mit
+   `value is string` ergibt deshalb eine leere Liste — kein Fehler, keine
+   Warnung. Genau das war von Anfang an drin und ist am 2026-09-03 aufgefallen:
+   `memberOf` kam mit 34 Werten vom DC, LDAPeek zeigte „0 direkt,
+   133 verschachtelt" und stempelte damit **jede** Gruppe als geerbt.
+   Abgesichert in `EntryReaderTests` mit einem Attribut, dessen Werte als
+   UTF-8-Bytes vorliegen — mit der alten Implementierung ist der Test rot.
+2. **Range-Retrieval** (`Services/RangeRetrieval.cs`). Ab ~1500 Werten liefert
    der DC `memberOf` unter dem Namen `memberOf;range=0-1499`. Wer nur auf
    `memberOf` prüft, bekommt null Gruppen. Fällt erst beim ersten Konto mit
    vielen Mitgliedschaften auf — also bei dem, wo jemand eine verlässliche
    Auskunft braucht. Abgesichert in `RangeRetrievalTests`.
-2. **Primärgruppe** (`Services/SidUtil.cs`). Sie steht in **keinem**
+3. **Primärgruppe** (`Services/SidUtil.cs`). Sie steht in **keinem**
    `member`/`memberOf`, sondern nur als RID in `primaryGroupID`. Ohne die
    SID-Arithmetik (Domänen-SID ableiten, RID anhängen, per `objectSid` suchen)
    fehlt bei jedem Konto „Domänen-Benutzer".
-3. **`objectCategory=person`**. `objectClass=user` allein liefert auch
+4. **`objectCategory=person`**. `objectClass=user` allein liefert auch
    Computerkonten, weil `computer` davon erbt.
 
 Dazu: `groupType` trägt das Vorzeichenbit (`0x80000000` = Sicherheitsgruppe) —

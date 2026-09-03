@@ -14,8 +14,11 @@ namespace LDAPeek.ViewModels;
 [SupportedOSPlatform("windows")]
 public sealed partial class MainWindowViewModel
 {
-    /// <summary>Die angezeigten (gefilterten) Gruppen.</summary>
+    /// <summary>Die angezeigten (gefilterten) Gruppen — flach, für Zählung und Export.</summary>
     public ObservableCollection<AdGroup> Groups { get; } = [];
+
+    /// <summary>Dieselben Gruppen, gegliedert nach der gewählten Ansicht.</summary>
+    public ObservableCollection<GroupNode> GroupNodes { get; } = [];
 
     /// <summary>Vollständiges Ergebnis der letzten Gruppenabfrage.</summary>
     private IReadOnlyList<AdGroup> _allGroups = [];
@@ -54,10 +57,55 @@ public sealed partial class MainWindowViewModel
 
     partial void OnSecurityGroupsOnlyChanged(bool value) => ApplyGroupFilter();
 
+    // ------------------------------------------------------------------
+    // Ansicht der Gruppenliste
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Gliederung der Liste. Die drei Schalter im Fenster sind Radiobuttons und
+    /// binden auf die drei Eigenschaften darunter — Avalonia kann eine
+    /// Aufzählung nicht ohne Konverter an <c>IsChecked</c> binden, und ein
+    /// Konverter wäre hier mehr Bauwerk als Nutzen.
+    /// </summary>
+    [ObservableProperty]
+    private GroupViewMode _groupView;
+
+    partial void OnGroupViewChanged(GroupViewMode value)
+    {
+        _settings.Current.GroupView = value;
+        _settings.Save();
+
+        OnPropertyChanged(nameof(IsNestingView));
+        OnPropertyChanged(nameof(IsOrganizationView));
+        OnPropertyChanged(nameof(IsFlatView));
+
+        // Nur die Gliederung ändert sich — die Daten bleiben, kein neuer Zugriff.
+        ApplyGroupFilter();
+    }
+
+    public bool IsNestingView
+    {
+        get => GroupView == GroupViewMode.Nesting;
+        set { if (value) GroupView = GroupViewMode.Nesting; }
+    }
+
+    public bool IsOrganizationView
+    {
+        get => GroupView == GroupViewMode.Organization;
+        set { if (value) GroupView = GroupViewMode.Organization; }
+    }
+
+    public bool IsFlatView
+    {
+        get => GroupView == GroupViewMode.Flat;
+        set { if (value) GroupView = GroupViewMode.Flat; }
+    }
+
     private void ClearGroups()
     {
         _allGroups = [];
         Groups.Clear();
+        GroupNodes.Clear();
         GroupSummary = "Keine Gruppen geladen.";
     }
 
@@ -106,12 +154,15 @@ public sealed partial class MainWindowViewModel
     {
         string filter = GroupFilter.Trim();
 
-        IEnumerable<AdGroup> visible = _allGroups;
-        if (SecurityGroupsOnly) visible = visible.Where(g => g.Kind == GroupKind.Security);
-        if (filter.Length > 0) visible = visible.Where(g => MatchesFilter(g, filter));
+        bool Matches(AdGroup group) =>
+            (!SecurityGroupsOnly || group.Kind == GroupKind.Security)
+            && (filter.Length == 0 || MatchesFilter(group, filter));
 
         Groups.Clear();
-        foreach (var group in visible) Groups.Add(group);
+        foreach (var group in _allGroups.Where(Matches)) Groups.Add(group);
+
+        GroupNodes.Clear();
+        foreach (var node in GroupTree.Build(_allGroups, GroupView, Matches)) GroupNodes.Add(node);
 
         GroupSummary = BuildGroupSummary(filter.Length > 0 || SecurityGroupsOnly);
         CopyGroupsCommand.NotifyCanExecuteChanged();

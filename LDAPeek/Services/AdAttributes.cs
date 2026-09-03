@@ -92,10 +92,14 @@ internal static class AdAttributes
         PrimaryGroupId, MemberOf,
     ];
 
-    /// <summary>Attributset für eine Gruppe.</summary>
+    /// <summary>
+    /// Attributset für eine Gruppe. <c>memberOf</c> ist hier kein Beiwerk: Es
+    /// liefert die Kanten für den Verschachtelungsbaum, und zwar innerhalb der
+    /// Abfrage, die ohnehin läuft — siehe <see cref="GroupTree"/>.
+    /// </summary>
     public static readonly string[] GroupSet =
     [
         CommonName, SamAccountName, DistinguishedName, Description,
-        GroupType, ObjectSid, Mail, ManagedBy, WhenCreated,
+        GroupType, ObjectSid, Mail, ManagedBy, WhenCreated, MemberOf,
     ];
 }

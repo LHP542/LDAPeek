@@ -442,6 +442,10 @@ public sealed class DirectoryService : IDirectoryService, IDisposable
             Scope = AdValue.ParseGroupScope(groupType),
             Kind = AdValue.ParseGroupKind(groupType),
             Membership = membership,
+            // Kein Range-Retrieval nötig: Eine Gruppe ist selten in mehr als
+            // 1500 anderen Gruppen Mitglied. Bei member (Mitglieder einer
+            // Gruppe) wäre das anders — das ist die Richtung, die überläuft.
+            MemberOfDns = reader.Strings(AdAttributes.MemberOf),
         };
     }
 

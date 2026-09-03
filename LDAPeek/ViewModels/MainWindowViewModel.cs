@@ -42,6 +42,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
         IncludeNestedGroups = settings.Current.ResolveNestedGroups;
         HideDisabledAccounts = settings.Current.HideDisabledAccounts;
+        GroupView = settings.Current.GroupView;
         RecentSearches = new ObservableCollection<string>(settings.Current.RecentSearches);
     }
 

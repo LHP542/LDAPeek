@@ -409,48 +409,105 @@
                             <Border Grid.Row="1" Padding="14,8"
                                     BorderBrush="{DynamicResource KrosteBorderBrush}"
                                     BorderThickness="0,0,0,1">
-                                <Grid ColumnDefinitions="*,Auto,Auto">
-                                    <TextBox Text="{Binding GroupFilter, Mode=TwoWay}"
-                                             PlaceholderText="🔍  Gruppen filtern …" />
-                                    <CheckBox Grid.Column="1" Margin="12,0,0,0"
-                                              Content="Nur Sicherheitsgruppen"
-                                              ToolTip.Tip="Verteilergruppen ausblenden — sie tragen keine Berechtigungen"
-                                              IsChecked="{Binding SecurityGroupsOnly, Mode=TwoWay}" />
-                                    <CheckBox Grid.Column="2" Margin="12,0,0,0"
-                                              Content="Verschachtelte auflösen"
-                                              ToolTip.Tip="Auch Gruppen zeigen, die der Benutzer über andere Gruppen erbt"
-                                              IsChecked="{Binding IncludeNestedGroups, Mode=TwoWay}" />
+                                <Grid RowDefinitions="Auto,Auto">
+                                    <Grid ColumnDefinitions="*,Auto,Auto">
+                                        <TextBox Text="{Binding GroupFilter, Mode=TwoWay}"
+                                                 PlaceholderText="🔍  Gruppen filtern …" />
+                                        <CheckBox Grid.Column="1" Margin="12,0,0,0"
+                                                  Content="Nur Sicherheitsgruppen"
+                                                  ToolTip.Tip="Verteilergruppen ausblenden — sie tragen keine Berechtigungen"
+                                                  IsChecked="{Binding SecurityGroupsOnly, Mode=TwoWay}" />
+                                        <CheckBox Grid.Column="2" Margin="12,0,0,0"
+                                                  Content="Verschachtelte auflösen"
+                                                  ToolTip.Tip="Auch Gruppen zeigen, die der Benutzer über andere Gruppen erbt"
+                                                  IsChecked="{Binding IncludeNestedGroups, Mode=TwoWay}" />
+                                    </Grid>
+
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal"
+                                                Spacing="6" Margin="0,8,0,0">
+                                        <TextBlock Text="Ansicht" Classes="muted" FontSize="11.5"
+                                                   VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <RadioButton Classes="segment" GroupName="GroupView"
+                                                     Content="Baum"
+                                                     ToolTip.Tip="Nach Verschachtelung: direkte Mitgliedschaften als Wurzel, geerbte darunter"
+                                                     IsChecked="{Binding IsNestingView, Mode=TwoWay}" />
+                                        <RadioButton Classes="segment" GroupName="GroupView"
+                                                     Content="Verzeichnis"
+                                                     ToolTip.Tip="Nach Organisationseinheit gruppiert"
+                                                     IsChecked="{Binding IsOrganizationView, Mode=TwoWay}" />
+                                        <RadioButton Classes="segment" GroupName="GroupView"
+                                                     Content="Flach"
+                                                     ToolTip.Tip="Alphabetische Liste ohne Gliederung"
+                                                     IsChecked="{Binding IsFlatView, Mode=TwoWay}" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
 
-                            <ScrollViewer Grid.Row="2">
-                                <ListBox ItemsSource="{Binding Groups}" Margin="0,4">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate x:DataType="models:AdGroup">
-                                            <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto">
-                                                <TextBlock Text="{Binding DisplayName}"
-                                                           FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis" />
+                            <TreeView Grid.Row="2" ItemsSource="{Binding GroupNodes}" Margin="0,4">
+                                <TreeView.ItemContainerTheme>
+                                    <ControlTheme TargetType="TreeViewItem"
+                                                  BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                                        <!-- Der Container hängt am GroupNode, nicht am Fenster-ViewModel;
+                                             ohne DataType sucht die Prüfung der Bindungen die Eigenschaft
+                                             am MainWindowViewModel und der Build bricht ab. -->
+                                        <Setter Property="IsExpanded"
+                                                Value="{Binding IsExpanded, DataType=models:GroupNode}" />
+                                    </ControlTheme>
+                                </TreeView.ItemContainerTheme>
 
-                                                <Border Grid.Column="1" Classes="badge" Margin="8,0,0,0"
-                                                        Classes.accent="{Binding IsDirect}"
-                                                        Classes.warn="{Binding IsPrimary}">
-                                                    <TextBlock Text="{Binding MembershipText}" />
-                                                </Border>
+                                <TreeView.ItemTemplate>
+                                    <TreeDataTemplate x:DataType="models:GroupNode"
+                                                      ItemsSource="{Binding Children}">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto"
+                                              ToolTip.Tip="{Binding Group.TooltipText}">
+                                            <!-- Überschrift der Verzeichnisansicht -->
+                                            <TextBlock Text="{Binding Title}"
+                                                       Classes="section-label" Margin="0"
+                                                       IsVisible="{Binding IsHeader}"
+                                                       TextTrimming="CharacterEllipsis" />
 
-                                                <Border Grid.Column="2" Classes="badge" Margin="6,0,0,0">
-                                                    <TextBlock Text="{Binding TypeText}" />
-                                                </Border>
+                                            <!-- Gruppenname; gedämpft, wenn der Knoten nur der Weg zu einem Treffer ist -->
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontWeight="SemiBold"
+                                                       Classes.muted="{Binding IsContext}"
+                                                       IsVisible="{Binding !IsHeader}"
+                                                       TextTrimming="CharacterEllipsis" />
 
-                                                <TextBlock Grid.Row="1" Grid.ColumnSpan="3"
-                                                           Text="{Binding SubtitleText}"
+                                            <Border Grid.Column="1" Classes="badge" Margin="8,0,0,0"
+                                                    Classes.accent="{Binding Group.IsDirect}"
+                                                    Classes.warn="{Binding Group.IsPrimary}"
+                                                    IsVisible="{Binding Group.ShowMembershipBadge, FallbackValue=False}">
+                                                <TextBlock Text="{Binding Group.MembershipText}" />
+                                            </Border>
+
+                                            <Border Grid.Column="2" Classes="badge" Margin="6,0,0,0"
+                                                    IsVisible="{Binding Group.ShowTypeBadge, FallbackValue=False}">
+                                                <TextBlock Text="{Binding Group.TypeBadgeText}" />
+                                            </Border>
+
+                                            <!-- Anzahl darunter, damit ein zugeklappter Ast sein Gewicht zeigt -->
+                                            <Border Grid.Column="1" Grid.ColumnSpan="2" Classes="badge"
+                                                    Margin="8,0,0,0" HorizontalAlignment="Right"
+                                                    IsVisible="{Binding IsHeader}">
+                                                <TextBlock Text="{Binding CountText}" />
+                                            </Border>
+
+                                            <StackPanel Grid.Row="1" Grid.ColumnSpan="3"
+                                                        Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding Subtitle}"
                                                            Classes="muted" FontSize="11.5"
+                                                           IsVisible="{Binding HasSubtitle}"
                                                            TextTrimming="CharacterEllipsis" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </ScrollViewer>
+                                                <TextBlock Text="{Binding AlsoViaText}"
+                                                           Classes="muted" FontSize="11.5"
+                                                           FontStyle="Italic"
+                                                           IsVisible="{Binding HasAlsoVia}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </TreeDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
                         </Grid>
                     </Border>
                 </Grid>
