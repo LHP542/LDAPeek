@@ -1,6 +1,7 @@
 using System.DirectoryServices.Protocols;
 using System.Globalization;
 using System.Runtime.Versioning;
+using System.Text;
 
 namespace LDAPeek.Services;
 
@@ -33,18 +34,65 @@ internal readonly struct EntryReader(SearchResultEntry entry)
     }
 
     /// <summary>Alle Werte als Zeichenketten.</summary>
-    public IReadOnlyList<string> Strings(string name)
+    public IReadOnlyList<string> Strings(string name) => ReadStrings(_entry.Attributes[name]);
+
+    /// <summary>
+    /// Wandelt die Werte eines Attributs in Zeichenketten.
+    ///
+    /// <b>Die Falle:</b> <see cref="DirectoryAttribute"/> erbt von
+    /// <c>CollectionBase</c>, und ein <c>foreach</c> darüber liefert die
+    /// <b>Rohwerte</b> — also <c>byte[]</c>, nicht <c>string</c>. Nur der
+    /// Indexer (und <c>GetValues</c>) wandeln den Wert nach UTF-8-Text um.
+    /// Eine Schleife mit <c>value is string</c> ergibt deshalb still eine leere
+    /// Liste: kein Fehler, keine Warnung, nur null Gruppen im Fenster.
+    ///
+    /// Der Indexer ist hier <c>GetValues</c> vorzuziehen, weil er echte
+    /// Binärwerte als <c>byte[]</c> zurückgibt, statt an ihnen zu scheitern.
+    /// Ob er dabei schon nach Text wandelt, hängt allerdings davon ab, wie das
+    /// Attribut entstanden ist — deshalb dekodieren wir einen Bytewert hier
+    /// selbst, statt uns darauf zu verlassen.
+    /// </summary>
+    internal static IReadOnlyList<string> ReadStrings(DirectoryAttribute? attribute)
     {
-        var attribute = _entry.Attributes[name];
         if (attribute is null || attribute.Count == 0) return [];
 
         var result = new List<string>(attribute.Count);
-        foreach (object? value in attribute)
+        for (int i = 0; i < attribute.Count; i++)
         {
-            if (value is string s && s.Length > 0) result.Add(s);
+            switch (attribute[i])
+            {
+                case string { Length: > 0 } text:
+                    result.Add(text);
+                    break;
+                case byte[] { Length: > 0 } bytes when TryDecodeUtf8(bytes, out string decoded):
+                    result.Add(decoded);
+                    break;
+            }
         }
         return result;
     }
+
+    /// <summary>
+    /// UTF-8 mit Ausnahme statt Ersatzzeichen: ein echter Binärwert (objectSid,
+    /// thumbnailPhoto) soll übersprungen werden, nicht als Zeichensalat in der
+    /// Liste landen.
+    /// </summary>
+    private static bool TryDecodeUtf8(byte[] bytes, out string decoded)
+    {
+        try
+        {
+            decoded = StrictUtf8.GetString(bytes);
+            return decoded.Length > 0;
+        }
+        catch (DecoderFallbackException)
+        {
+            decoded = string.Empty;
+            return false;
+        }
+    }
+
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
 
     /// <summary>
     /// Ganzzahl. AD liefert auch Zahlen als Text — <c>userAccountControl</c>
