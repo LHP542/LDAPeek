@@ -1,0 +1,112 @@
+# **Forgejo-Fassung von .github/workflows/ci.yml.**
+#
+# Erzeugt von Werkzeuge/forgejo/workflow-uebertragen.py am 27.10.2026.
+# Gebaut wird fuer git.flexfamily.cloud; die GitHub-Fassung bleibt vorerst
+# daneben bestehen.
+#
+# **Beide Dateien gehoeren synchron.** Wer an den Bauschritten etwas
+# aendert, zieht es hier nach -- sonst laufen die Seiten auseinander, und
+# das faellt erst auf, wenn eine von beiden rot wird.
+#
+# Diese Datei muss hier liegen, auch wenn sie unveraendert ist: Sobald
+# .forgejo/workflows existiert, ignoriert Forgejo .github/workflows
+# vollstaendig. Ohne die Kopie laeuft in Forgejo gar keine CI mehr.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    # LDAPeek zielt auf net10.0-windows — die Tests müssen auf Windows laufen.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # MinVer braucht die volle Historie inkl. Tags
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: Directory.Packages.props
+
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+
+      # KEINE VSTest-Flags. xunit.v3 läuft auf der Microsoft.Testing.Platform,
+      # die "--logger trx;..." nicht kennt: sie meldet "Unknown option
+      # '--logger'", führt NULL Tests aus und endet mit Exitcode 5. Der Lauf ist
+      # dann rot, OHNE dass ein Test fehlschlägt — real hier passiert
+      # (2026-08-25). Gleiches gilt für --nologo.
+      #
+      # Der TRX-Report kommt stattdessen von xunit selbst und heißt
+      # --report-xunit-trx (nicht --report-trx, das gehört zu einer separaten
+      # Testing-Platform-Erweiterung). Optionen für die Test-App müssen hinter
+      # dem "--"-Separator stehen.
+      - name: Tests
+        run: >
+          dotnet test --no-build -c Release --
+          --report-xunit-trx --report-xunit-trx-filename test-results.trx
+
+      # Ohne diesen Schritt steht in der Job-Zusammenfassung eines roten Laufs
+      # nur "Process completed with exit code 1". Das Job-Log ist zwar mit
+      # angemeldetem gh lesbar, Annotations sind es aber auch ohne — und sie
+      # stehen direkt am Lauf, statt 500 Zeilen Log durchsuchen zu müssen.
+      #
+      # Bewusst aus der TRX und nicht aus der Konsolenausgabe: die TRX ist
+      # strukturiert und sprachunabhängig. Ein Parser auf den Konsolentext
+      # müsste "failed ..." suchen und bräche, sobald das SDK lokalisiert
+      # ausgibt ("fehlerhaft ...").
+      - name: Testfehler als Annotation ausgeben
+        if: failure()
+        run: |
+          # Fehlgeschlagene Tests als Annotation ausgeben.
+          #
+          # **In Python statt PowerShell**: Der Forgejo-Runner laeuft unter
+          # Linux, pwsh gibt es dort nicht. Der Ablauf ist derselbe wie in
+          # der GitHub-Fassung -- TRX suchen, fehlgeschlagene Faelle lesen,
+          # je einen ::error:: ausgeben.
+          python3 - <<'TRXLESER'
+          import glob, xml.etree.ElementTree as ET
+
+          dateien = glob.glob('**/test-results.trx', recursive=True)
+          if not dateien:
+              print('::error::Keine test-results.trx gefunden — der Lauf ist vor den Tests gescheitert (Build? Restore?).')
+              raise SystemExit(0)
+
+          NS = {'t': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
+          gefunden = 0
+          for datei in dateien:
+              baum = ET.parse(datei)
+              for fall in baum.iterfind('.//t:UnitTestResult', NS):
+                  if fall.get('outcome') != 'Failed':
+                      continue
+                  fehler = fall.find('.//t:ErrorInfo', NS)
+                  nachricht = (fehler.findtext('t:Message', '', NS) if fehler is not None else '').strip()
+                  stapel = (fehler.findtext('t:StackTrace', '', NS) if fehler is not None else '')
+                  # Den ersten Frame aus dem EIGENEN Testcode nehmen: Der
+                  # oberste ist sonst FluentAssertions-Innenleben und sagt
+                  # nichts darueber, wo der Test steht.
+                  frames = [z.strip() for z in stapel.splitlines() if z.strip()]
+                  eigen = next((z for z in frames if 'LDAPeek' in z), None)
+                  rahmen = eigen or (frames[0] if frames else '')
+                  # Zeilenumbrueche als %0A, sonst bricht die Annotation
+                  # nach der ersten Zeile ab.
+                  text = '%0A'.join(t for t in (nachricht, rahmen) if t)
+                  print(f"::error title={fall.get('testName')}::{text}")
+                  gefunden += 1
+
+          if gefunden == 0:
+              print('::error::Testlauf rot, aber die TRX nennt keinen fehlgeschlagenen Test — bitte ins Job-Log sehen.')
+          TRXLESER
+      - name: Testergebnis als Artefakt
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: "**/test-results.trx"
+          retention-days: 7
