@@ -51,6 +51,12 @@ public class UpdateChannelTests
     [Fact]
     public void ParseVersionFromFileName_akzeptiert_einen_vollen_Pfad()
     {
+        // Ein UNC-Pfad mit Backslashes. Unter Linux ist "\" kein
+        // Verzeichnistrenner, dort bliebe der ganze String stehen -- der Test
+        // pruefte also Windows-Verhalten auf einem System, das es nicht hat.
+        // LDAPeek laeuft ohnehin nur unter Windows; der Netzwerkordner, aus
+        // dem die Updates kommen, ist eine Samba-Freigabe.
+        WindowsOnly.Require(OperatingSystem.IsWindows());
         UpdateChannel.ParseVersionFromFileName(@"\\samba01\542$\x\LDAPeek-2.10.3-win-x64.zip")
             .Should().Be(new Version(2, 10, 3));
     }

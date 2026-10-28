@@ -233,6 +233,7 @@ public class AccessGateTests
     [Fact]
     public void ResolveGroupSid_nimmt_eine_SID_direkt_an()
     {
+        WindowsOnly.Require(OperatingSystem.IsWindows());
         // S-1-5-32-544 = Vordefiniert\Administratoren, existiert auf jedem
         // Windows-System und braucht keine Domaene.
         var sid = AccessGate.ResolveGroupSid("S-1-5-32-544");
@@ -258,6 +259,7 @@ public class AccessGateTests
     [Fact]
     public void ResolveGroupSid_meldet_einen_unbekannten_Namen_als_null()
     {
+        WindowsOnly.Require(OperatingSystem.IsWindows());
         // Ein Tippfehler im Gruppennamen darf nicht still zur Erlaubnis werden.
         AccessGate.ResolveGroupSid("Gruppe-die-es-nicht-gibt-" + Guid.NewGuid().ToString("N"))
             .Should().BeNull();
@@ -290,6 +292,7 @@ public class AccessGateTests
     [Fact]
     public void CheckToken_sperrt_bei_unaufloesbarer_Gruppe()
     {
+        WindowsOnly.Require(OperatingSystem.IsWindows());
         var gate = new AccessGate(
             new AccessPolicy { RequiredGroup = "gibt-es-nicht-" + Guid.NewGuid().ToString("N") },
             new NullDirectory());
